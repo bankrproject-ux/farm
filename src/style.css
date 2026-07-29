@@ -19,9 +19,12 @@ body {
     Arial,
     Helvetica,
     sans-serif;
-
   color: #ffffff;
   user-select: none;
+}
+
+button {
+  font: inherit;
 }
 
 canvas {
@@ -30,32 +33,28 @@ canvas {
   height: 100%;
 }
 
-/* =========================
-   HUD
-========================= */
+/* =====================================================
+   GAME HUD
+===================================================== */
 
 .hud {
   position: fixed;
   inset: 0;
-
   pointer-events: none;
-
   z-index: 10;
 }
 
-/* =========================
+/* =====================================================
    GAME TITLE
-========================= */
+===================================================== */
 
 .game-title {
   position: absolute;
-
   top: 28px;
   left: 32px;
 
   font-size: 18px;
   font-weight: 800;
-
   letter-spacing: 3px;
 
   color: #ffffff;
@@ -67,24 +66,21 @@ canvas {
 
 .game-title span {
   display: block;
-
   margin-top: 6px;
 
   font-size: 10px;
   font-weight: 500;
-
   letter-spacing: 4px;
 
   color: #62aaff;
 }
 
-/* =========================
-   STATS PANEL
-========================= */
+/* =====================================================
+   HUD STATS
+===================================================== */
 
 .stats {
   position: absolute;
-
   top: 25px;
   right: 30px;
 
@@ -106,8 +102,7 @@ canvas {
   background:
     rgba(5, 10, 18, 0.72);
 
-  backdrop-filter:
-    blur(10px);
+  backdrop-filter: blur(10px);
 
   box-shadow:
     0 8px 30px
@@ -116,12 +111,10 @@ canvas {
 
 .stat-label {
   display: block;
-
   margin-bottom: 5px;
 
   font-size: 9px;
   font-weight: 700;
-
   letter-spacing: 2px;
 
   color: #6f8199;
@@ -130,35 +123,27 @@ canvas {
 .stat strong {
   font-size: 17px;
   font-weight: 700;
-
   color: #ffffff;
 }
-
-/* Balance */
 
 .stat:first-child strong {
   color: #6cff9d;
 }
 
-/* Hashrate */
-
 .stat:nth-child(2) strong {
   color: #62aaff;
 }
-
-/* Power */
 
 .stat:nth-child(3) strong {
   color: #ffce66;
 }
 
-/* =========================
+/* =====================================================
    CROSSHAIR
-========================= */
+===================================================== */
 
 .crosshair {
   position: absolute;
-
   top: 50%;
   left: 50%;
 
@@ -182,7 +167,6 @@ canvas {
   content: "";
 
   position: absolute;
-
   top: 50%;
   left: 50%;
 
@@ -203,21 +187,19 @@ canvas {
   height: 18px;
 }
 
-/* =========================
-   BOTTOM STATUS
-========================= */
+/* =====================================================
+   BOTTOM HELP
+===================================================== */
 
 .help {
   position: absolute;
-
   bottom: 25px;
   left: 50%;
 
   transform:
     translateX(-50%);
 
-  padding:
-    9px 16px;
+  padding: 9px 16px;
 
   border:
     1px solid
@@ -230,18 +212,637 @@ canvas {
 
   font-size: 9px;
   font-weight: 700;
-
   letter-spacing: 3px;
 
   color: #63aaff;
 
-  backdrop-filter:
-    blur(8px);
+  backdrop-filter: blur(8px);
 }
 
-/* =========================
+/* =====================================================
+   SHOP OVERLAY
+===================================================== */
+
+.shop-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 100;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 28px;
+
+  background:
+    rgba(2, 5, 10, 0.82);
+
+  backdrop-filter:
+    blur(10px);
+
+  user-select: none;
+}
+
+.shop-overlay.hidden {
+  display: none;
+}
+
+/* =====================================================
+   SHOP PANEL
+===================================================== */
+
+.shop-panel {
+  width: min(
+    1180px,
+    100%
+  );
+
+  height: min(
+    820px,
+    calc(100vh - 56px)
+  );
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  border:
+    1px solid
+    rgba(88, 158, 255, 0.25);
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(13, 19, 28, 0.98),
+      rgba(5, 9, 15, 0.98)
+    );
+
+  box-shadow:
+    0 30px 100px
+    rgba(0, 0, 0, 0.65),
+    0 0 80px
+    rgba(32, 112, 255, 0.08);
+}
+
+/* =====================================================
+   SHOP HEADER
+===================================================== */
+
+.shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding:
+    24px 26px;
+
+  border-bottom:
+    1px solid
+    rgba(255, 255, 255, 0.07);
+}
+
+.shop-eyebrow {
+  margin-bottom: 6px;
+
+  font-size: 9px;
+  font-weight: 800;
+
+  letter-spacing: 4px;
+
+  color: #579dff;
+}
+
+.shop-header h2 {
+  font-size: 24px;
+  font-weight: 850;
+
+  letter-spacing: 2px;
+
+  color: #f6f9ff;
+}
+
+.shop-header-right {
+  display: flex;
+  align-items: center;
+
+  gap: 18px;
+}
+
+.shop-balance {
+  min-width: 145px;
+
+  padding:
+    9px 14px;
+
+  border:
+    1px solid
+    rgba(91, 255, 153, 0.16);
+
+  border-radius: 8px;
+
+  background:
+    rgba(29, 255, 118, 0.045);
+}
+
+.shop-balance span {
+  display: block;
+
+  margin-bottom: 3px;
+
+  font-size: 8px;
+  font-weight: 800;
+
+  letter-spacing: 2px;
+
+  color: #728497;
+}
+
+.shop-balance strong {
+  font-size: 17px;
+
+  color: #6cff9d;
+}
+
+.shop-close {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.1);
+
+  border-radius: 8px;
+
+  background:
+    rgba(255, 255, 255, 0.04);
+
+  color: #9aa7b8;
+
+  font-size: 25px;
+
+  cursor: pointer;
+
+  transition:
+    0.15s ease;
+}
+
+.shop-close:hover {
+  color: #ffffff;
+
+  border-color:
+    rgba(255, 90, 90, 0.4);
+
+  background:
+    rgba(255, 70, 70, 0.1);
+}
+
+/* =====================================================
+   SHOP TABS
+===================================================== */
+
+.shop-tabs {
+  display: flex;
+
+  padding:
+    0 26px;
+
+  border-bottom:
+    1px solid
+    rgba(255, 255, 255, 0.07);
+
+  background:
+    rgba(0, 0, 0, 0.12);
+}
+
+.shop-tab {
+  position: relative;
+
+  padding:
+    17px 22px;
+
+  border: 0;
+
+  background: transparent;
+
+  color: #69798d;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 2px;
+
+  cursor: pointer;
+
+  transition:
+    color 0.15s ease;
+}
+
+.shop-tab:hover {
+  color: #b7c7dc;
+}
+
+.shop-tab.active {
+  color: #67a9ff;
+}
+
+.shop-tab.active::after {
+  content: "";
+
+  position: absolute;
+
+  left: 20px;
+  right: 20px;
+  bottom: -1px;
+
+  height: 2px;
+
+  background: #5ba4ff;
+
+  box-shadow:
+    0 0 14px
+    rgba(70, 155, 255, 0.8);
+}
+
+/* =====================================================
+   SHOP CONTENT
+===================================================== */
+
+.shop-content {
+  flex: 1;
+
+  overflow-y: auto;
+
+  padding: 24px 26px;
+}
+
+.shop-content::-webkit-scrollbar {
+  width: 7px;
+}
+
+.shop-content::-webkit-scrollbar-track {
+  background:
+    rgba(255, 255, 255, 0.02);
+}
+
+.shop-content::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+
+  background:
+    rgba(103, 169, 255, 0.3);
+}
+
+/* =====================================================
+   SHOP GRID
+===================================================== */
+
+.shop-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 14px;
+}
+
+/* =====================================================
+   HARDWARE CARD
+===================================================== */
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+
+  min-height: 340px;
+
+  padding: 18px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.07);
+
+  border-radius: 10px;
+
+  background:
+    linear-gradient(
+      150deg,
+      rgba(22, 30, 41, 0.78),
+      rgba(9, 14, 21, 0.9)
+    );
+
+  box-shadow:
+    inset 0 1px 0
+    rgba(255, 255, 255, 0.025);
+
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.shop-card:hover {
+  transform:
+    translateY(-2px);
+
+  border-color:
+    rgba(87, 157, 255, 0.28);
+
+  background:
+    linear-gradient(
+      150deg,
+      rgba(25, 36, 50, 0.9),
+      rgba(9, 14, 21, 0.96)
+    );
+}
+
+/* =====================================================
+   CARD HEADER
+===================================================== */
+
+.shop-card-top {
+  display: flex;
+  justify-content: space-between;
+
+  gap: 12px;
+}
+
+.shop-tier {
+  display: inline-block;
+
+  margin-bottom: 8px;
+
+  font-size: 8px;
+  font-weight: 850;
+
+  letter-spacing: 2px;
+
+  text-transform: uppercase;
+
+  color: #5ca5ff;
+}
+
+.shop-card h3 {
+  margin-bottom: 3px;
+
+  font-size: 17px;
+
+  color: #f4f7fb;
+}
+
+.shop-card small {
+  font-size: 10px;
+
+  color: #65768a;
+}
+
+.shop-owned {
+  height: fit-content;
+
+  padding:
+    5px 7px;
+
+  border:
+    1px solid
+    rgba(87, 255, 153, 0.16);
+
+  border-radius: 5px;
+
+  background:
+    rgba(63, 255, 135, 0.05);
+
+  font-size: 7px;
+  font-weight: 800;
+
+  letter-spacing: 1px;
+
+  color: #6cff9d;
+}
+
+/* =====================================================
+   DESCRIPTION
+===================================================== */
+
+.shop-description {
+  min-height: 50px;
+
+  margin:
+    17px 0;
+
+  color: #7d8b9d;
+
+  font-size: 11px;
+
+  line-height: 1.55;
+}
+
+/* =====================================================
+   HARDWARE STATS
+===================================================== */
+
+.hardware-stats {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 7px;
+
+  margin-bottom: 18px;
+}
+
+.hardware-stats > div {
+  padding:
+    8px 9px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.045);
+
+  border-radius: 6px;
+
+  background:
+    rgba(0, 0, 0, 0.18);
+}
+
+.hardware-stats span {
+  display: block;
+
+  margin-bottom: 4px;
+
+  font-size: 7px;
+  font-weight: 800;
+
+  letter-spacing: 1px;
+
+  color: #58687b;
+}
+
+.hardware-stats strong {
+  font-size: 11px;
+
+  color: #c8d3df;
+}
+
+/* =====================================================
+   CARD BOTTOM
+===================================================== */
+
+.shop-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  margin-top: auto;
+
+  padding-top: 14px;
+
+  border-top:
+    1px solid
+    rgba(255, 255, 255, 0.06);
+}
+
+.shop-price span {
+  display: block;
+
+  margin-bottom: 3px;
+
+  font-size: 7px;
+  font-weight: 800;
+
+  letter-spacing: 1px;
+
+  color: #58687b;
+}
+
+.shop-price strong {
+  font-size: 16px;
+
+  color: #ffffff;
+}
+
+/* =====================================================
+   BUY BUTTON
+===================================================== */
+
+.shop-buy {
+  min-width: 100px;
+
+  padding:
+    10px 13px;
+
+  border:
+    1px solid
+    rgba(75, 157, 255, 0.55);
+
+  border-radius: 6px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(55, 137, 255, 0.22),
+      rgba(34, 104, 214, 0.15)
+    );
+
+  color: #76b2ff;
+
+  font-size: 9px;
+  font-weight: 850;
+
+  letter-spacing: 1.5px;
+
+  cursor: pointer;
+
+  transition:
+    0.15s ease;
+}
+
+.shop-buy:hover:not(:disabled) {
+  border-color:
+    rgba(104, 177, 255, 0.9);
+
+  background:
+    rgba(65, 148, 255, 0.28);
+
+  color: #ffffff;
+
+  box-shadow:
+    0 0 18px
+    rgba(50, 130, 255, 0.15);
+}
+
+.shop-buy:disabled {
+  cursor: not-allowed;
+
+  border-color:
+    rgba(255, 255, 255, 0.07);
+
+  background:
+    rgba(255, 255, 255, 0.025);
+
+  color: #4c5866;
+}
+
+/* =====================================================
+   SHOP FOOTER
+===================================================== */
+
+.shop-footer {
+  padding:
+    12px 26px;
+
+  border-top:
+    1px solid
+    rgba(255, 255, 255, 0.06);
+
+  background:
+    rgba(0, 0, 0, 0.18);
+
+  color: #526174;
+
+  font-size: 8px;
+  font-weight: 700;
+
+  letter-spacing: 1.5px;
+
+  text-transform: uppercase;
+}
+
+/* =====================================================
+   TABLET
+===================================================== */
+
+@media (
+  max-width: 950px
+) {
+  .shop-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+/* =====================================================
    MOBILE
-========================= */
+===================================================== */
 
 @media (
   max-width: 700px
@@ -264,7 +865,6 @@ canvas {
 
   .stat {
     min-width: 0;
-
     flex: 1;
 
     padding:
@@ -276,6 +876,69 @@ canvas {
   }
 
   .stat-label {
+    font-size: 7px;
+  }
+
+  .shop-overlay {
+    padding: 10px;
+  }
+
+  .shop-panel {
+    height:
+      calc(
+        100vh - 20px
+      );
+
+    border-radius: 10px;
+  }
+
+  .shop-header {
+    padding: 16px;
+  }
+
+  .shop-header h2 {
+    font-size: 17px;
+  }
+
+  .shop-eyebrow {
+    font-size: 7px;
+  }
+
+  .shop-balance {
+    display: none;
+  }
+
+  .shop-tabs {
+    padding:
+      0 8px;
+  }
+
+  .shop-tab {
+    flex: 1;
+
+    padding:
+      14px 8px;
+
+    font-size: 8px;
+  }
+
+  .shop-content {
+    padding: 14px;
+  }
+
+  .shop-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .shop-card {
+    min-height: 320px;
+  }
+
+  .shop-footer {
+    padding:
+      10px 14px;
+
     font-size: 7px;
   }
 }
