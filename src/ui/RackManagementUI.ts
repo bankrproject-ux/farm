@@ -1,5 +1,15 @@
 import type {
   RackInstance,
+  InstalledMiner,
+} from "../mining/RackTypes";
+
+import {
+  getUsedSlots,
+  getRackPowerUsage,
+  getInstalledPowerRequirement,
+  getRackHashrate,
+  findAvailableSlot,
+  canInstallMiner,
 } from "../mining/RackTypes";
 
 import type {
@@ -17,7 +27,7 @@ import InventorySystem, {
 
 export type MinerInstalledCallback = (
   rack: RackInstance,
-  miner: MinerDefinition,
+  installedMiner: InstalledMiner,
   inventoryItem: InventoryMinerItem
 ) => void;
 
@@ -155,7 +165,7 @@ export default class RackManagementUI {
     );
 
     // ==================================================
-    // CLOSE
+    // CLOSE BUTTON
     // ==================================================
 
     const closeButton =
@@ -238,6 +248,15 @@ export default class RackManagementUI {
   }
 
   // ====================================================
+  // CURRENT RACK
+  // ====================================================
+
+  public getCurrentRack():
+    RackInstance | null {
+    return this.currentRack;
+  }
+
+  // ====================================================
   // RENDER
   // ====================================================
 
@@ -250,17 +269,22 @@ export default class RackManagementUI {
       this.currentRack;
 
     const usedSlots =
-      this.getUsedSlots(
+      getUsedSlots(
         rack
       );
 
     const usedPower =
-      this.getUsedPower(
+      getRackPowerUsage(
+        rack
+      );
+
+    const requiredPower =
+      getInstalledPowerRequirement(
         rack
       );
 
     const totalHashrate =
-      this.getTotalHashrate(
+      getRackHashrate(
         rack
       );
 
@@ -275,14 +299,14 @@ export default class RackManagementUI {
       Math.max(
         0,
         rack.definition.maxPower -
-          usedPower
+          requiredPower
       );
 
     this.content.innerHTML =
       "";
 
     // ==================================================
-    // RACK SUMMARY
+    // SUMMARY
     // ==================================================
 
     const summary =
@@ -390,7 +414,7 @@ export default class RackManagementUI {
     );
 
     // ==================================================
-    // MAIN GRID
+    // MAIN LAYOUT
     // ==================================================
 
     const layout =
@@ -402,7 +426,7 @@ export default class RackManagementUI {
       "rack-management-layout";
 
     // ==================================================
-    // LEFT — INSTALLED HARDWARE
+    // INSTALLED SERVERS
     // ==================================================
 
     const installedSection =
@@ -452,8 +476,7 @@ export default class RackManagementUI {
         </strong>
 
         <p>
-          No mining servers
-          installed.
+          No mining servers installed.
         </p>
       `;
 
@@ -469,19 +492,23 @@ export default class RackManagementUI {
       installedList.className =
         "installed-miner-list";
 
-      rack.miners.forEach(
-        (
-          miner,
-          index
-        ) => {
-          installedList.appendChild(
-            this.createInstalledMiner(
-              miner,
-              index
-            )
-          );
-        }
-      );
+      const sortedMiners =
+        [...rack.miners].sort(
+          (a, b) =>
+            a.slotIndex -
+            b.slotIndex
+        );
+
+      for (
+        const installed
+        of sortedMiners
+      ) {
+        installedList.appendChild(
+          this.createInstalledMiner(
+            installed
+          )
+        );
+      }
 
       installedSection.appendChild(
         installedList
@@ -493,7 +520,7 @@ export default class RackManagementUI {
     );
 
     // ==================================================
-    // RIGHT — INVENTORY
+    // AVAILABLE SERVERS
     // ==================================================
 
     const inventorySection =
@@ -526,8 +553,7 @@ export default class RackManagementUI {
     `;
 
     if (
-      availableMiners.length ===
-      0
+      availableMiners.length === 0
     ) {
       const empty =
         document.createElement(
@@ -571,9 +597,7 @@ export default class RackManagementUI {
         list.appendChild(
           this.createAvailableMiner(
             item,
-            rack,
-            availableSlots,
-            availablePower
+            rack
           )
         );
       }
@@ -593,13 +617,16 @@ export default class RackManagementUI {
   }
 
   // ====================================================
-  // INSTALLED MINER
+  // INSTALLED MINER ROW
   // ====================================================
 
   private createInstalledMiner(
-    miner: MinerDefinition,
-    index: number
+    installed:
+      InstalledMiner
   ): HTMLDivElement {
+    const miner =
+      installed.miner;
+
     const row =
       document.createElement(
         "div"
@@ -611,7 +638,7 @@ export default class RackManagementUI {
     row.innerHTML = `
       <div class="installed-miner-number">
         ${String(
-          index + 1
+          installed.slotIndex + 1
         ).padStart(
           2,
           "0"
@@ -634,9 +661,13 @@ export default class RackManagementUI {
         </span>
 
         <strong>
-          ${this.formatHashrate(
-            miner.hashRate
-          )}
+          ${
+            installed.powered
+              ? this.formatHashrate(
+                  miner.hashRate
+                )
+              : "0 MH/s"
+          }
         </strong>
       </div>
 
@@ -646,14 +677,22 @@ export default class RackManagementUI {
         </span>
 
         <strong>
-          ${this.formatPower(
-            miner.powerUsage
-          )}
+          ${
+            installed.powered
+              ? this.formatPower(
+                  miner.powerUsage
+                )
+              : "0 W"
+          }
         </strong>
       </div>
 
       <div class="installed-miner-status">
-        ONLINE
+        ${
+          installed.powered
+            ? "ONLINE"
+            : "OFFLINE"
+        }
       </div>
     `;
 
@@ -661,36 +700,51 @@ export default class RackManagementUI {
   }
 
   // ====================================================
-  // AVAILABLE MINER
+  // AVAILABLE MINER ROW
   // ====================================================
 
   private createAvailableMiner(
     item: InventoryMinerItem,
-    rack: RackInstance,
-    availableSlots: number,
-    availablePower: number
+    rack: RackInstance
   ): HTMLDivElement {
     const miner =
       item.definition;
 
+    const slotIndex =
+      findAvailableSlot(
+        rack,
+        miner
+      );
+
     const enoughSlots =
-      miner.rackSlots <=
-      availableSlots;
+      slotIndex !== null;
+
+    const requiredPower =
+      getInstalledPowerRequirement(
+        rack
+      ) +
+      miner.powerUsage;
 
     const enoughPower =
-      miner.powerUsage <=
-      availablePower;
+      requiredPower <=
+      rack.definition.maxPower;
 
-    const canInstall =
-      enoughSlots &&
-      enoughPower;
+    const installable =
+      canInstallMiner(
+        rack,
+        miner
+      );
 
     let reason =
       "";
 
     if (!enoughSlots) {
       reason =
-        `Requires ${miner.rackSlots}U rack space`;
+        `Requires ${miner.rackSlots} consecutive rack slot${
+          miner.rackSlots === 1
+            ? ""
+            : "s"
+        }`;
     } else if (!enoughPower) {
       reason =
         "Rack power limit exceeded";
@@ -704,7 +758,7 @@ export default class RackManagementUI {
     row.className =
       "available-miner";
 
-    if (!canInstall) {
+    if (!installable) {
       row.classList.add(
         "unavailable"
       );
@@ -775,13 +829,13 @@ export default class RackManagementUI {
         type="button"
         class="rack-install-button"
         ${
-          canInstall
+          installable
             ? ""
             : "disabled"
         }
       >
         ${
-          canInstall
+          installable
             ? "INSTALL"
             : "UNAVAILABLE"
         }
@@ -814,12 +868,7 @@ export default class RackManagementUI {
     rack: RackInstance,
     item: InventoryMinerItem
   ) {
-    const miner =
-      item.definition;
-
-    // ----------------------------------------------
-    // Make sure inventory item still exists.
-    // ----------------------------------------------
+    // Make sure the item still exists.
 
     const storedItem =
       this.inventory.getItem(
@@ -835,41 +884,59 @@ export default class RackManagementUI {
       return;
     }
 
-    // ----------------------------------------------
-    // Re-check rack capacity.
-    // Never trust UI button state alone.
-    // ----------------------------------------------
+    const miner:
+      MinerDefinition =
+      storedItem.definition;
 
-    const usedSlots =
-      this.getUsedSlots(
-        rack
-      );
-
-    const usedPower =
-      this.getUsedPower(
-        rack
-      );
+    // ----------------------------------------------
+    // Check rack limits again.
+    // ----------------------------------------------
 
     if (
-      usedSlots +
-        miner.rackSlots >
-      rack.definition.totalSlots
-    ) {
-      this.render();
-      return;
-    }
-
-    if (
-      usedPower +
-        miner.powerUsage >
-      rack.definition.maxPower
+      !canInstallMiner(
+        rack,
+        miner
+      )
     ) {
       this.render();
       return;
     }
 
     // ----------------------------------------------
-    // Remove from inventory.
+    // Find actual consecutive slot range.
+    // ----------------------------------------------
+
+    const slotIndex =
+      findAvailableSlot(
+        rack,
+        miner
+      );
+
+    if (
+      slotIndex === null
+    ) {
+      this.render();
+      return;
+    }
+
+    // ----------------------------------------------
+    // Create the correct InstalledMiner object.
+    // ----------------------------------------------
+
+    const installedMiner:
+      InstalledMiner = {
+        instanceId:
+          item.instanceId,
+
+        miner,
+
+        slotIndex,
+
+        powered: true,
+      };
+
+    // ----------------------------------------------
+    // Remove from storage.
     // ----------------------------------------------
 
     const removed =
@@ -883,25 +950,20 @@ export default class RackManagementUI {
     }
 
     // ----------------------------------------------
-    // Install into rack.
+    // Add to physical rack.
     // ----------------------------------------------
 
     rack.miners.push(
-      miner
+      installedMiner
     );
 
     // ----------------------------------------------
-    // Notify game.
-    //
-    // Later main.ts uses this to:
-    // - create physical server mesh
-    // - add hashrate
-    // - add power usage
+    // Notify main game.
     // ----------------------------------------------
 
     this.onMinerInstalled(
       rack,
-      miner,
+      installedMiner,
       item
     );
 
@@ -921,62 +983,9 @@ export default class RackManagementUI {
           item
         ): item is
           InventoryMinerItem =>
-          item.type === "miner"
+          item.type ===
+          "miner"
       );
-  }
-
-  // ====================================================
-  // USED SLOTS
-  // ====================================================
-
-  private getUsedSlots(
-    rack: RackInstance
-  ): number {
-    return rack.miners.reduce(
-      (
-        total,
-        miner
-      ) =>
-        total +
-        miner.rackSlots,
-      0
-    );
-  }
-
-  // ====================================================
-  // USED POWER
-  // ====================================================
-
-  private getUsedPower(
-    rack: RackInstance
-  ): number {
-    return rack.miners.reduce(
-      (
-        total,
-        miner
-      ) =>
-        total +
-        miner.powerUsage,
-      0
-    );
-  }
-
-  // ====================================================
-  // HASHRATE
-  // ====================================================
-
-  private getTotalHashrate(
-    rack: RackInstance
-  ): number {
-    return rack.miners.reduce(
-      (
-        total,
-        miner
-      ) =>
-        total +
-        miner.hashRate,
-      0
-    );
   }
 
   // ====================================================
@@ -1024,7 +1033,8 @@ export default class RackManagementUI {
       hashRate >= 1000
     ) {
       return `${(
-        hashRate / 1000
+        hashRate /
+        1000
       ).toFixed(
         2
       )} GH/s`;
