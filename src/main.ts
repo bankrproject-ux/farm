@@ -6,6 +6,7 @@ import GameState from "./game/GameState";
 import InventorySystem from "./game/InventorySystem";
 import RackPlacementSystem from "./game/RackPlacementSystem";
 import RackInteractionSystem from "./game/RackInteractionSystem";
+import MinerVisualSystem from "./game/MinerVisualSystem";
 
 import ShopUI from "./ui/ShopUI";
 import InventoryUI from "./ui/InventoryUI";
@@ -123,6 +124,15 @@ const player =
   new PlayerController(
     camera,
     renderer.domElement
+  );
+
+// ======================================================
+// MINER VISUAL SYSTEM
+// ======================================================
+
+const minerVisuals =
+  new MinerVisualSystem(
+    scene
   );
 
 // ======================================================
@@ -631,8 +641,6 @@ const shop =
 
 // ======================================================
 // RACK MANAGEMENT
-//
-// Declared before interaction callback is used.
 // ======================================================
 
 const rackManagement =
@@ -642,34 +650,48 @@ const rackManagement =
     (
       rack,
       installedMiner,
-      inventoryItem
+      _inventoryItem
     ) => {
-      console.log(
-        "Miner installed:",
-        {
-          rack:
-            rack.instanceId,
+      // ----------------------------------------------
+      // CREATE PHYSICAL MINER
+      // ----------------------------------------------
 
-          miner:
-            installedMiner
-              .miner.name,
-
-          minerInstance:
-            installedMiner
-              .instanceId,
-
-          slot:
-            installedMiner
-              .slotIndex,
-
-          inventoryItem:
-            inventoryItem
-              .instanceId,
-        }
+      minerVisuals.addMiner(
+        rack,
+        installedMiner
       );
 
-      // Physical miner mesh and global
-      // mining stats are added next.
+      // ----------------------------------------------
+      // ADD MINING POWER
+      //
+      // Only powered miners contribute.
+      // ----------------------------------------------
+
+      if (
+        installedMiner.powered
+      ) {
+        gameState.addMiningPower(
+          installedMiner
+            .miner.hashRate,
+
+          installedMiner
+            .miner.powerUsage
+        );
+      }
+
+      console.log(
+        "Miner online:",
+        installedMiner
+          .miner.name,
+
+        installedMiner
+          .miner.hashRate,
+        "MH/s",
+
+        installedMiner
+          .miner.powerUsage,
+        "W"
+      );
     }
   );
 
@@ -725,10 +747,23 @@ const rackPlacement =
       rack,
       object
     ) => {
-      // Every newly placed rack becomes
-      // interactable immediately.
+      // ----------------------------------------------
+      // INTERACTION
+      // ----------------------------------------------
 
       rackInteraction.registerRack(
+        rack,
+        object
+      );
+
+      // ----------------------------------------------
+      // MINER VISUAL SYSTEM
+      //
+      // Gives MinerVisualSystem access to
+      // the physical THREE.Group of this rack.
+      // ----------------------------------------------
+
+      minerVisuals.registerRack(
         rack,
         object
       );
@@ -1004,8 +1039,6 @@ document.addEventListener(
 
 // ======================================================
 // UI STATE WATCHER
-//
-// Also handles X buttons inside UI classes.
 // ======================================================
 
 let lastUIState =
@@ -1096,7 +1129,7 @@ function animate() {
     );
 
   // ----------------------------------------------
-  // PLAYER MOVEMENT
+  // PLAYER
   // ----------------------------------------------
 
   if (
@@ -1115,7 +1148,7 @@ function animate() {
   rackPlacement.update();
 
   // ----------------------------------------------
-  // RACK TARGETING
+  // RACK INTERACTION
   // ----------------------------------------------
 
   if (
@@ -1126,7 +1159,7 @@ function animate() {
   }
 
   // ----------------------------------------------
-  // ECONOMY
+  // MINING ECONOMY
   // ----------------------------------------------
 
   gameState.update(
