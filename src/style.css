@@ -1402,3 +1402,993 @@ canvas {
     font-size: 7px;
   }
 }
+
+/* =====================================================
+   RACK INTERACTION PROMPT
+===================================================== */
+
+.interaction-prompt {
+  position: fixed;
+
+  left: 50%;
+  bottom: 90px;
+
+  z-index: 80;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  transform:
+    translateX(-50%);
+
+  padding:
+    9px 13px;
+
+  border:
+    1px solid
+    rgba(91, 164, 255, 0.28);
+
+  border-radius: 7px;
+
+  background:
+    rgba(5, 10, 17, 0.88);
+
+  backdrop-filter:
+    blur(8px);
+
+  box-shadow:
+    0 8px 30px
+    rgba(0, 0, 0, 0.4);
+
+  pointer-events: none;
+}
+
+.interaction-prompt.hidden {
+  display: none;
+}
+
+.interaction-key {
+  width: 31px;
+  height: 31px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    rgba(100, 173, 255, 0.55);
+
+  border-radius: 5px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(65, 147, 255, 0.2),
+      rgba(25, 80, 160, 0.15)
+    );
+
+  color: #7ab8ff;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  box-shadow:
+    inset 0 1px 0
+    rgba(255, 255, 255, 0.06),
+    0 0 14px
+    rgba(50, 130, 255, 0.12);
+}
+
+.interaction-text {
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.interaction-text span {
+  color: #63758a;
+
+  font-size: 7px;
+  font-weight: 800;
+
+  letter-spacing: 1.5px;
+}
+
+.interaction-text strong {
+  color: #dce8f7;
+
+  font-size: 9px;
+  font-weight: 850;
+
+  letter-spacing: 1.7px;
+}
+
+/* =====================================================
+   RACK MANAGEMENT OVERLAY
+===================================================== */
+
+.rack-management-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 120;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 28px;
+
+  background:
+    rgba(2, 5, 10, 0.86);
+
+  backdrop-filter:
+    blur(11px);
+}
+
+.rack-management-overlay.hidden {
+  display: none;
+}
+
+/* =====================================================
+   RACK MANAGEMENT PANEL
+===================================================== */
+
+.rack-management-panel {
+  width:
+    min(
+      1180px,
+      100%
+    );
+
+  height:
+    min(
+      800px,
+      calc(
+        100vh - 56px
+      )
+    );
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  border:
+    1px solid
+    rgba(87, 158, 255, 0.25);
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(13, 19, 28, 0.99),
+      rgba(5, 9, 15, 0.99)
+    );
+
+  box-shadow:
+    0 30px 100px
+    rgba(0, 0, 0, 0.7),
+    0 0 80px
+    rgba(32, 112, 255, 0.07);
+}
+
+/* =====================================================
+   RACK MANAGEMENT HEADER
+===================================================== */
+
+.rack-management-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding:
+    23px 26px;
+
+  border-bottom:
+    1px solid
+    rgba(255, 255, 255, 0.07);
+}
+
+.rack-management-eyebrow {
+  margin-bottom: 6px;
+
+  color: #579dff;
+
+  font-size: 9px;
+  font-weight: 800;
+
+  letter-spacing: 4px;
+}
+
+.rack-management-header h2 {
+  color: #f6f9ff;
+
+  font-size: 24px;
+  font-weight: 850;
+
+  letter-spacing: 2px;
+}
+
+.rack-management-close {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.1);
+
+  border-radius: 8px;
+
+  background:
+    rgba(255, 255, 255, 0.04);
+
+  color: #9aa7b8;
+
+  font-size: 25px;
+
+  cursor: pointer;
+
+  transition:
+    0.15s ease;
+}
+
+.rack-management-close:hover {
+  color: #ffffff;
+
+  border-color:
+    rgba(255, 90, 90, 0.4);
+
+  background:
+    rgba(255, 70, 70, 0.1);
+}
+
+/* =====================================================
+   RACK MANAGEMENT CONTENT
+===================================================== */
+
+.rack-management-content {
+  flex: 1;
+
+  overflow-y: auto;
+
+  padding:
+    22px 25px;
+}
+
+.rack-management-content::-webkit-scrollbar {
+  width: 7px;
+}
+
+.rack-management-content::-webkit-scrollbar-track {
+  background:
+    rgba(255, 255, 255, 0.02);
+}
+
+.rack-management-content::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+
+  background:
+    rgba(103, 169, 255, 0.3);
+}
+
+/* =====================================================
+   RACK SUMMARY
+===================================================== */
+
+.rack-summary {
+  margin-bottom: 18px;
+
+  padding: 18px;
+
+  border:
+    1px solid
+    rgba(92, 163, 255, 0.14);
+
+  border-radius: 10px;
+
+  background:
+    linear-gradient(
+      140deg,
+      rgba(32, 50, 70, 0.35),
+      rgba(8, 13, 20, 0.7)
+    );
+}
+
+.rack-summary-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-bottom: 17px;
+}
+
+.rack-summary-title span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #579dff;
+
+  font-size: 7px;
+  font-weight: 850;
+
+  letter-spacing: 2px;
+}
+
+.rack-summary-title h3 {
+  margin-bottom: 3px;
+
+  color: #f2f6fb;
+
+  font-size: 19px;
+}
+
+.rack-summary-title small {
+  color: #65768a;
+
+  font-size: 9px;
+}
+
+.rack-status {
+  padding:
+    6px 9px;
+
+  border:
+    1px solid
+    rgba(79, 255, 145, 0.18);
+
+  border-radius: 5px;
+
+  background:
+    rgba(60, 255, 130, 0.05);
+
+  color: #6cff9d;
+
+  font-size: 7px;
+  font-weight: 900;
+
+  letter-spacing: 1.5px;
+}
+
+/* =====================================================
+   RACK SUMMARY STATS
+===================================================== */
+
+.rack-summary-stats {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      4,
+      minmax(0, 1fr)
+    );
+
+  gap: 8px;
+}
+
+.rack-summary-stats > div {
+  padding:
+    11px 12px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.05);
+
+  border-radius: 6px;
+
+  background:
+    rgba(0, 0, 0, 0.2);
+}
+
+.rack-summary-stats span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #5f7084;
+
+  font-size: 7px;
+  font-weight: 800;
+
+  letter-spacing: 1.2px;
+}
+
+.rack-summary-stats strong {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #dce6f1;
+
+  font-size: 13px;
+}
+
+.rack-summary-stats small {
+  color: #506174;
+
+  font-size: 6px;
+  font-weight: 700;
+
+  letter-spacing: 0.8px;
+}
+
+/* =====================================================
+   MANAGEMENT LAYOUT
+===================================================== */
+
+.rack-management-layout {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr);
+
+  gap: 14px;
+}
+
+.rack-management-section {
+  min-height: 390px;
+
+  padding: 15px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.065);
+
+  border-radius: 9px;
+
+  background:
+    rgba(8, 13, 20, 0.7);
+}
+
+/* =====================================================
+   SECTION HEADING
+===================================================== */
+
+.rack-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 15px;
+
+  margin-bottom: 14px;
+
+  padding-bottom: 12px;
+
+  border-bottom:
+    1px solid
+    rgba(255, 255, 255, 0.06);
+}
+
+.rack-section-heading span {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #55718e;
+
+  font-size: 6px;
+  font-weight: 850;
+
+  letter-spacing: 1.6px;
+}
+
+.rack-section-heading h3 {
+  color: #d7e0eb;
+
+  font-size: 11px;
+  font-weight: 850;
+
+  letter-spacing: 1.5px;
+}
+
+.rack-section-heading > strong {
+  min-width: 30px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    rgba(87, 157, 255, 0.16);
+
+  border-radius: 5px;
+
+  background:
+    rgba(70, 140, 255, 0.05);
+
+  color: #68aaff;
+
+  font-size: 11px;
+}
+
+/* =====================================================
+   EMPTY RACK
+===================================================== */
+
+.rack-empty {
+  min-height: 285px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+}
+
+.rack-empty-icon {
+  margin-bottom: 12px;
+
+  color: #477eb9;
+
+  font-size: 34px;
+}
+
+.rack-empty strong {
+  margin-bottom: 6px;
+
+  color: #8495a8;
+
+  font-size: 10px;
+  font-weight: 850;
+
+  letter-spacing: 2px;
+}
+
+.rack-empty p {
+  max-width: 220px;
+
+  color: #526174;
+
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+/* =====================================================
+   INSTALLED MINERS
+===================================================== */
+
+.installed-miner-list,
+.available-miner-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.installed-miner {
+  display: grid;
+
+  grid-template-columns:
+    32px
+    minmax(100px, 1fr)
+    85px
+    75px
+    60px;
+
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 10px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.05);
+
+  border-radius: 6px;
+
+  background:
+    rgba(0, 0, 0, 0.2);
+}
+
+.installed-miner-number {
+  width: 27px;
+  height: 27px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    rgba(87, 157, 255, 0.15);
+
+  border-radius: 4px;
+
+  color: #579dff;
+
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.installed-miner-info {
+  min-width: 0;
+}
+
+.installed-miner-info strong {
+  display: block;
+
+  overflow: hidden;
+
+  margin-bottom: 3px;
+
+  color: #dce5ef;
+
+  font-size: 10px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installed-miner-info span {
+  color: #566679;
+
+  font-size: 7px;
+}
+
+.installed-miner-stat span {
+  display: block;
+
+  margin-bottom: 3px;
+
+  color: #536275;
+
+  font-size: 6px;
+  font-weight: 800;
+
+  letter-spacing: 0.7px;
+}
+
+.installed-miner-stat strong {
+  color: #aab8c8;
+
+  font-size: 8px;
+}
+
+.installed-miner-status {
+  padding:
+    5px 6px;
+
+  border:
+    1px solid
+    rgba(74, 255, 140, 0.15);
+
+  border-radius: 4px;
+
+  background:
+    rgba(63, 255, 132, 0.04);
+
+  color: #63ef97;
+
+  font-size: 6px;
+  font-weight: 900;
+
+  letter-spacing: 1px;
+
+  text-align: center;
+}
+
+/* =====================================================
+   AVAILABLE MINER
+===================================================== */
+
+.available-miner {
+  padding: 11px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.055);
+
+  border-radius: 7px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(24, 33, 44, 0.7),
+      rgba(7, 11, 17, 0.8)
+    );
+}
+
+.available-miner.unavailable {
+  opacity: 0.55;
+}
+
+.available-miner-info {
+  margin-bottom: 9px;
+}
+
+.available-miner-info > span {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #579dff;
+
+  font-size: 6px;
+  font-weight: 850;
+
+  letter-spacing: 1.5px;
+}
+
+.available-miner-info > strong {
+  display: block;
+
+  margin-bottom: 2px;
+
+  color: #e0e8f1;
+
+  font-size: 11px;
+}
+
+.available-miner-info small {
+  color: #58697c;
+
+  font-size: 7px;
+}
+
+/* =====================================================
+   AVAILABLE MINER SPECS
+===================================================== */
+
+.available-miner-specs {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 5px;
+
+  margin-bottom: 9px;
+}
+
+.available-miner-specs > div {
+  padding: 7px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.045);
+
+  border-radius: 4px;
+
+  background:
+    rgba(0, 0, 0, 0.18);
+}
+
+.available-miner-specs span {
+  display: block;
+
+  margin-bottom: 3px;
+
+  color: #536275;
+
+  font-size: 6px;
+  font-weight: 800;
+}
+
+.available-miner-specs strong {
+  color: #aebdcd;
+
+  font-size: 8px;
+}
+
+/* =====================================================
+   WARNING
+===================================================== */
+
+.available-miner-warning {
+  margin-bottom: 8px;
+
+  padding: 6px 7px;
+
+  border:
+    1px solid
+    rgba(255, 190, 75, 0.12);
+
+  border-radius: 4px;
+
+  background:
+    rgba(255, 170, 40, 0.04);
+
+  color: #d59b4d;
+
+  font-size: 7px;
+}
+
+/* =====================================================
+   INSTALL BUTTON
+===================================================== */
+
+.rack-install-button {
+  width: 100%;
+
+  padding:
+    8px 10px;
+
+  border:
+    1px solid
+    rgba(75, 157, 255, 0.5);
+
+  border-radius: 5px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(55, 137, 255, 0.2),
+      rgba(34, 104, 214, 0.13)
+    );
+
+  color: #75b2ff;
+
+  font-size: 7px;
+  font-weight: 900;
+
+  letter-spacing: 1.4px;
+
+  cursor: pointer;
+
+  transition:
+    0.15s ease;
+}
+
+.rack-install-button:hover:not(:disabled) {
+  border-color:
+    rgba(105, 178, 255, 0.85);
+
+  background:
+    rgba(65, 148, 255, 0.25);
+
+  color: #ffffff;
+}
+
+.rack-install-button:disabled {
+  cursor: not-allowed;
+
+  border-color:
+    rgba(255, 255, 255, 0.06);
+
+  background:
+    rgba(255, 255, 255, 0.025);
+
+  color: #4b5867;
+}
+
+/* =====================================================
+   FOOTER
+===================================================== */
+
+.rack-management-footer {
+  padding:
+    12px 25px;
+
+  border-top:
+    1px solid
+    rgba(255, 255, 255, 0.06);
+
+  background:
+    rgba(0, 0, 0, 0.18);
+
+  color: #526174;
+
+  font-size: 8px;
+  font-weight: 700;
+
+  letter-spacing: 1.3px;
+
+  text-transform: uppercase;
+}
+
+/* =====================================================
+   RACK MANAGEMENT TABLET
+===================================================== */
+
+@media (max-width: 900px) {
+  .rack-summary-stats {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+  .rack-management-layout {
+    grid-template-columns:
+      1fr;
+  }
+
+  .rack-management-section {
+    min-height: 300px;
+  }
+}
+
+/* =====================================================
+   RACK MANAGEMENT MOBILE
+===================================================== */
+
+@media (max-width: 700px) {
+  .interaction-prompt {
+    bottom: 75px;
+  }
+
+  .rack-management-overlay {
+    padding: 10px;
+  }
+
+  .rack-management-panel {
+    height:
+      calc(
+        100vh - 20px
+      );
+
+    border-radius: 10px;
+  }
+
+  .rack-management-header {
+    padding: 16px;
+  }
+
+  .rack-management-header h2 {
+    font-size: 17px;
+  }
+
+  .rack-management-eyebrow {
+    font-size: 7px;
+  }
+
+  .rack-management-content {
+    padding: 14px;
+  }
+
+  .rack-summary-stats {
+    grid-template-columns:
+      1fr 1fr;
+  }
+
+  .installed-miner {
+    grid-template-columns:
+      28px
+      minmax(
+        80px,
+        1fr
+      )
+      65px;
+
+    gap: 6px;
+  }
+
+  .installed-miner-stat:nth-of-type(2) {
+    display: none;
+  }
+
+  .installed-miner-status {
+    display: none;
+  }
+
+  .rack-management-footer {
+    padding: 10px 14px;
+
+    font-size: 7px;
+  }
+}
