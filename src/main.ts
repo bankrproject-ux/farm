@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import "./style.css";
 
+import PlayerController from "./game/PlayerController";
+
 // ======================================================
 // MINING TYCOON 3D
 // Main Entry Point
@@ -67,6 +69,16 @@ renderer.toneMappingExposure = 1.15;
 app.appendChild(renderer.domElement);
 
 // ======================================================
+// PLAYER CONTROLLER
+// ======================================================
+
+const player =
+  new PlayerController(
+    camera,
+    renderer.domElement
+  );
+
+// ======================================================
 // LIGHTING
 // ======================================================
 
@@ -78,28 +90,28 @@ const ambientLight =
 
 scene.add(ambientLight);
 
-const ceilingLight =
+const mainLight =
   new THREE.DirectionalLight(
     0xffffff,
     2.5
   );
 
-ceilingLight.position.set(
+mainLight.position.set(
   4,
   8,
   5
 );
 
-ceilingLight.castShadow = true;
+mainLight.castShadow = true;
 
-ceilingLight.shadow.mapSize.set(
+mainLight.shadow.mapSize.set(
   2048,
   2048
 );
 
-scene.add(ceilingLight);
+scene.add(mainLight);
 
-// Blue industrial light
+// Industrial blue accent.
 
 const blueLight =
   new THREE.PointLight(
@@ -120,23 +132,18 @@ scene.add(blueLight);
 // FLOOR
 // ======================================================
 
-const floorGeometry =
-  new THREE.PlaneGeometry(
-    20,
-    20
-  );
-
-const floorMaterial =
-  new THREE.MeshStandardMaterial({
-    color: 0x242a32,
-    roughness: 0.72,
-    metalness: 0.18,
-  });
-
 const floor =
   new THREE.Mesh(
-    floorGeometry,
-    floorMaterial
+    new THREE.PlaneGeometry(
+      20,
+      20
+    ),
+
+    new THREE.MeshStandardMaterial({
+      color: 0x242a32,
+      roughness: 0.72,
+      metalness: 0.18,
+    })
   );
 
 floor.rotation.x =
@@ -147,7 +154,7 @@ floor.receiveShadow = true;
 scene.add(floor);
 
 // ======================================================
-// GRID
+// FLOOR GRID
 // ======================================================
 
 const grid =
@@ -246,7 +253,60 @@ rightWall.receiveShadow = true;
 scene.add(rightWall);
 
 // ======================================================
-// CEILING STRIP LIGHTS
+// FRONT WALL DETAILS
+//
+// Front is intentionally open for now.
+// Later this can become the facility entrance.
+// ======================================================
+
+const frontBeam =
+  new THREE.Mesh(
+    new THREE.BoxGeometry(
+      20,
+      0.35,
+      0.35
+    ),
+    wallMaterial
+  );
+
+frontBeam.position.set(
+  0,
+  4.8,
+  9.8
+);
+
+scene.add(frontBeam);
+
+// ======================================================
+// CEILING
+// ======================================================
+
+const ceiling =
+  new THREE.Mesh(
+    new THREE.PlaneGeometry(
+      20,
+      20
+    ),
+
+    new THREE.MeshStandardMaterial({
+      color: 0x10151c,
+      roughness: 0.85,
+      metalness: 0.1,
+      side: THREE.DoubleSide,
+    })
+  );
+
+ceiling.rotation.x =
+  Math.PI / 2;
+
+ceiling.position.y = 5;
+
+ceiling.receiveShadow = true;
+
+scene.add(ceiling);
+
+// ======================================================
+// CEILING LIGHTS
 // ======================================================
 
 function createCeilingLight(
@@ -260,6 +320,7 @@ function createCeilingLight(
         0.08,
         0.22
       ),
+
       new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: 0xd9ecff,
@@ -269,7 +330,7 @@ function createCeilingLight(
 
   fixture.position.set(
     x,
-    4.65,
+    4.86,
     z
   );
 
@@ -284,7 +345,7 @@ function createCeilingLight(
 
   light.position.set(
     x,
-    4.3,
+    4.4,
     z
   );
 
@@ -313,8 +374,6 @@ createCeilingLight(
 
 // ======================================================
 // TEMPORARY SERVER RACK
-// Just visual reference for now.
-// Later this becomes a real purchasable rack.
 // ======================================================
 
 const rack =
@@ -342,13 +401,22 @@ rackBody.receiveShadow = true;
 
 rack.add(rackBody);
 
-// Front server slots
+// ======================================================
+// SERVER SLOTS
+// ======================================================
 
 const slotMaterial =
   new THREE.MeshStandardMaterial({
     color: 0x151b21,
     roughness: 0.45,
     metalness: 0.7,
+  });
+
+const ledMaterial =
+  new THREE.MeshStandardMaterial({
+    color: 0x00ff88,
+    emissive: 0x00ff88,
+    emissiveIntensity: 4,
   });
 
 for (
@@ -374,8 +442,6 @@ for (
 
   rack.add(slot);
 
-  // Tiny status LED
-
   const led =
     new THREE.Mesh(
       new THREE.BoxGeometry(
@@ -383,11 +449,7 @@ for (
         0.05,
         0.03
       ),
-      new THREE.MeshStandardMaterial({
-        color: 0x00ff88,
-        emissive: 0x00ff88,
-        emissiveIntensity: 4,
-      })
+      ledMaterial
     );
 
   led.position.set(
@@ -408,8 +470,7 @@ rack.position.set(
 scene.add(rack);
 
 // ======================================================
-// SIMPLE HUD
-// Temporary until we build the real HUD system.
+// HUD
 // ======================================================
 
 const hud =
@@ -425,62 +486,70 @@ hud.innerHTML = `
 
   <div class="stats">
     <div class="stat">
-      <span class="stat-label">BALANCE</span>
-      <strong>$5,000</strong>
+      <span class="stat-label">
+        BALANCE
+      </span>
+
+      <strong>
+        $5,000
+      </strong>
     </div>
 
     <div class="stat">
-      <span class="stat-label">HASHRATE</span>
-      <strong>0 H/s</strong>
+      <span class="stat-label">
+        HASHRATE
+      </span>
+
+      <strong>
+        0 H/s
+      </strong>
     </div>
 
     <div class="stat">
-      <span class="stat-label">POWER</span>
-      <strong>0 W</strong>
+      <span class="stat-label">
+        POWER
+      </span>
+
+      <strong>
+        0 W
+      </strong>
     </div>
   </div>
 
   <div class="crosshair"></div>
 
   <div class="help">
-    MINING FACILITY ONLINE
+    CLICK TO ENTER FACILITY
   </div>
 `;
 
 app.appendChild(hud);
 
+const help =
+  hud.querySelector<HTMLDivElement>(
+    ".help"
+  );
+
 // ======================================================
-// TEMP CAMERA MOVEMENT
-//
-// WASD movement for testing.
-// Mouse-look comes with PlayerController later.
+// POINTER LOCK UI
 // ======================================================
 
-const keys: Record<string, boolean> =
-  {};
+document.addEventListener(
+  "pointerlockchange",
+  () => {
+    if (!help) {
+      return;
+    }
 
-window.addEventListener(
-  "keydown",
-  (event) => {
-    keys[
-      event.code
-    ] = true;
+    if (player.isPointerLocked()) {
+      help.textContent =
+        "WASD MOVE  •  MOUSE LOOK  •  ESC RELEASE";
+    } else {
+      help.textContent =
+        "CLICK TO ENTER FACILITY";
+    }
   }
 );
-
-window.addEventListener(
-  "keyup",
-  (event) => {
-    keys[
-      event.code
-    ] = false;
-  }
-);
-
-const movementSpeed = 4;
-
-const clock =
-  new THREE.Clock();
 
 // ======================================================
 // RESIZE
@@ -499,8 +568,22 @@ window.addEventListener(
       window.innerWidth,
       window.innerHeight
     );
+
+    renderer.setPixelRatio(
+      Math.min(
+        window.devicePixelRatio,
+        2
+      )
+    );
   }
 );
+
+// ======================================================
+// GAME CLOCK
+// ======================================================
+
+const clock =
+  new THREE.Clock();
 
 // ======================================================
 // GAME LOOP
@@ -517,57 +600,7 @@ function animate() {
       0.05
     );
 
-  const direction =
-    new THREE.Vector3();
-
-  if (keys["KeyW"]) {
-    direction.z -= 1;
-  }
-
-  if (keys["KeyS"]) {
-    direction.z += 1;
-  }
-
-  if (keys["KeyA"]) {
-    direction.x -= 1;
-  }
-
-  if (keys["KeyD"]) {
-    direction.x += 1;
-  }
-
-  if (
-    direction.lengthSq() >
-    0
-  ) {
-    direction.normalize();
-
-    camera.position.x +=
-      direction.x *
-      movementSpeed *
-      delta;
-
-    camera.position.z +=
-      direction.z *
-      movementSpeed *
-      delta;
-  }
-
-  // Keep player inside room.
-
-  camera.position.x =
-    THREE.MathUtils.clamp(
-      camera.position.x,
-      -9,
-      9
-    );
-
-  camera.position.z =
-    THREE.MathUtils.clamp(
-      camera.position.z,
-      -9,
-      9
-    );
+  player.update(delta);
 
   renderer.render(
     scene,
