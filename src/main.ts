@@ -4,11 +4,14 @@ import "./style.css";
 import PlayerController from "./game/PlayerController";
 import GameState from "./game/GameState";
 import InventorySystem from "./game/InventorySystem";
+import RackPlacementSystem from "./game/RackPlacementSystem";
+
 import ShopUI from "./ui/ShopUI";
+import InventoryUI from "./ui/InventoryUI";
 
 // ======================================================
 // MINING TYCOON 3D
-// Main Entry Point
+// MAIN
 // ======================================================
 
 const app =
@@ -23,7 +26,7 @@ if (!app) {
 }
 
 // ======================================================
-// CORE GAME SYSTEMS
+// CORE SYSTEMS
 // ======================================================
 
 const gameState =
@@ -121,7 +124,7 @@ const player =
   );
 
 // ======================================================
-// LIGHTING
+// LIGHTS
 // ======================================================
 
 const ambientLight =
@@ -157,8 +160,6 @@ mainLight.shadow.mapSize.set(
 scene.add(
   mainLight
 );
-
-// Blue industrial accent.
 
 const blueLight =
   new THREE.PointLight(
@@ -219,7 +220,7 @@ scene.add(
 );
 
 // ======================================================
-// FLOOR GRID
+// GRID
 // ======================================================
 
 const grid =
@@ -319,7 +320,7 @@ scene.add(
 );
 
 // ======================================================
-// FRONT TOP BEAM
+// FRONT BEAM
 // ======================================================
 
 const frontBeam =
@@ -446,117 +447,6 @@ createCeilingLight(
 );
 
 // ======================================================
-// TEMPORARY DISPLAY RACK
-//
-// This rack is ONLY scenery.
-// It is not owned by the player and does not mine.
-//
-// Later we remove this once rack placement is working.
-// ======================================================
-
-const displayRack =
-  new THREE.Group();
-
-const rackFrameMaterial =
-  new THREE.MeshStandardMaterial({
-    color: 0x080a0d,
-    roughness: 0.35,
-    metalness: 0.85,
-  });
-
-const rackBody =
-  new THREE.Mesh(
-    new THREE.BoxGeometry(
-      1.6,
-      3.2,
-      1.1
-    ),
-    rackFrameMaterial
-  );
-
-rackBody.castShadow =
-  true;
-
-rackBody.receiveShadow =
-  true;
-
-displayRack.add(
-  rackBody
-);
-
-const slotMaterial =
-  new THREE.MeshStandardMaterial({
-    color: 0x151b21,
-    roughness: 0.45,
-    metalness: 0.7,
-  });
-
-const ledMaterial =
-  new THREE.MeshStandardMaterial({
-    color: 0x00ff88,
-    emissive: 0x00ff88,
-    emissiveIntensity: 4,
-  });
-
-for (
-  let i = 0;
-  i < 8;
-  i++
-) {
-  const slot =
-    new THREE.Mesh(
-      new THREE.BoxGeometry(
-        1.35,
-        0.27,
-        0.08
-      ),
-      slotMaterial
-    );
-
-  slot.position.set(
-    0,
-    -1.15 +
-      i * 0.33,
-    0.565
-  );
-
-  displayRack.add(
-    slot
-  );
-
-  const led =
-    new THREE.Mesh(
-      new THREE.BoxGeometry(
-        0.05,
-        0.05,
-        0.03
-      ),
-      ledMaterial
-    );
-
-  led.position.set(
-    0.5,
-    -1.15 +
-      i * 0.33,
-    0.62
-  );
-
-  displayRack.add(
-    led
-  );
-}
-
-displayRack.position.set(
-  0,
-  1.6,
-  -6
-);
-
-scene.add(
-  displayRack
-);
-
-// ======================================================
 // HUD
 // ======================================================
 
@@ -583,9 +473,7 @@ hud.innerHTML = `
         BALANCE
       </span>
 
-      <strong
-        data-hud="balance"
-      >
+      <strong data-hud="balance">
         $5,000.00
       </strong>
     </div>
@@ -595,9 +483,7 @@ hud.innerHTML = `
         HASHRATE
       </span>
 
-      <strong
-        data-hud="hashrate"
-      >
+      <strong data-hud="hashrate">
         0 MH/s
       </strong>
     </div>
@@ -607,19 +493,16 @@ hud.innerHTML = `
         POWER
       </span>
 
-      <strong
-        data-hud="power"
-      >
+      <strong data-hud="power">
         0 W
       </strong>
     </div>
   </div>
 
-  <div class="crosshair">
-  </div>
+  <div class="crosshair"></div>
 
   <div class="help">
-    CLICK TO ENTER FACILITY
+    CLICK TO ENTER
   </div>
 `;
 
@@ -628,7 +511,7 @@ app.appendChild(
 );
 
 // ======================================================
-// HUD ELEMENT REFERENCES
+// HUD REFERENCES
 // ======================================================
 
 const balanceHUD =
@@ -647,12 +530,12 @@ const powerHUD =
   );
 
 const help =
-  hud.querySelector<HTMLDivElement>(
+  hud.querySelector<HTMLElement>(
     ".help"
   );
 
 const crosshair =
-  hud.querySelector<HTMLDivElement>(
+  hud.querySelector<HTMLElement>(
     ".crosshair"
   );
 
@@ -716,7 +599,7 @@ function formatPower(
 }
 
 // ======================================================
-// LIVE HUD
+// LIVE GAME STATE HUD
 // ======================================================
 
 gameState.subscribe(
@@ -755,97 +638,234 @@ const shop =
   );
 
 // ======================================================
-// SHOP KEY
-//
-// B = Hardware Market
+// RACK PLACEMENT
+// ======================================================
+
+const rackPlacement =
+  new RackPlacementSystem(
+    scene,
+    camera,
+    renderer.domElement,
+    inventory,
+
+    (
+      rack,
+      object
+    ) => {
+      console.log(
+        "Rack placed:",
+        rack.instanceId,
+        object.position
+      );
+    }
+  );
+
+// ======================================================
+// INVENTORY
+// ======================================================
+
+const inventoryUI =
+  new InventoryUI(
+    inventory,
+
+    (rackItem) => {
+      rackPlacement.start(
+        rackItem
+      );
+    }
+  );
+
+// ======================================================
+// UI STATE
+// ======================================================
+
+function anyMenuOpen():
+  boolean {
+  return (
+    shop.isOpen() ||
+    inventoryUI.isOpen()
+  );
+}
+
+function updateHUDState() {
+  if (
+    crosshair
+  ) {
+    crosshair.style.display =
+      anyMenuOpen()
+        ? "none"
+        : "";
+  }
+
+  if (!help) {
+    return;
+  }
+
+  if (
+    shop.isOpen()
+  ) {
+    help.textContent =
+      "HARDWARE MARKET";
+
+    return;
+  }
+
+  if (
+    inventoryUI.isOpen()
+  ) {
+    help.textContent =
+      "FACILITY INVENTORY";
+
+    return;
+  }
+
+  if (
+    rackPlacement.isActive()
+  ) {
+    help.textContent =
+      "LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
+
+    return;
+  }
+
+  if (
+    player.isPointerLocked()
+  ) {
+    help.textContent =
+      "WASD MOVE  •  B SHOP  •  I INVENTORY  •  ESC RELEASE";
+
+    return;
+  }
+
+  help.textContent =
+    "CLICK TO ENTER  •  B SHOP  •  I INVENTORY";
+}
+
+// ======================================================
+// B = SHOP
 // ======================================================
 
 window.addEventListener(
   "keydown",
   (event) => {
     if (
-      event.code !==
-      "KeyB"
-    ) {
-      return;
-    }
-
-    if (
+      event.code !== "KeyB" ||
       event.repeat
     ) {
       return;
     }
 
-    shop.toggle();
-  }
-);
+    // Don't open shop during
+    // rack placement.
 
-// ======================================================
-// POINTER LOCK UI
-// ======================================================
-
-document.addEventListener(
-  "pointerlockchange",
-  () => {
-    if (!help) {
+    if (
+      rackPlacement.isActive()
+    ) {
       return;
     }
 
+    // Close inventory first.
+
     if (
-      player.isPointerLocked()
+      inventoryUI.isOpen()
     ) {
-      help.textContent =
-        "WASD MOVE  •  B SHOP  •  ESC RELEASE";
-    } else {
-      if (
-        shop.isOpen()
-      ) {
-        help.textContent =
-          "HARDWARE MARKET";
-      } else {
-        help.textContent =
-          "CLICK TO ENTER  •  B HARDWARE MARKET";
-      }
+      inventoryUI.close();
     }
+
+    shop.toggle();
+
+    setTimeout(
+      updateHUDState,
+      0
+    );
   }
 );
 
 // ======================================================
-// SHOP UI VISUAL STATE
+// I = INVENTORY
 // ======================================================
 
 window.addEventListener(
   "keydown",
   (event) => {
     if (
-      event.code ===
-      "KeyB"
+      event.code !== "KeyI" ||
+      event.repeat
     ) {
-      setTimeout(
-        () => {
-          if (
-            crosshair
-          ) {
-            crosshair.style.display =
-              shop.isOpen()
-                ? "none"
-                : "";
-          }
-
-          if (
-            help
-          ) {
-            help.textContent =
-              shop.isOpen()
-                ? "HARDWARE MARKET"
-                : "CLICK TO ENTER  •  B HARDWARE MARKET";
-          }
-        },
-        0
-      );
+      return;
     }
+
+    // Don't open inventory
+    // during placement.
+
+    if (
+      rackPlacement.isActive()
+    ) {
+      return;
+    }
+
+    // Close shop first.
+
+    if (
+      shop.isOpen()
+    ) {
+      shop.close();
+    }
+
+    inventoryUI.toggle();
+
+    setTimeout(
+      updateHUDState,
+      0
+    );
   }
 );
+
+// ======================================================
+// POINTER LOCK
+// ======================================================
+
+document.addEventListener(
+  "pointerlockchange",
+  () => {
+    updateHUDState();
+  }
+);
+
+// ======================================================
+// PERIODIC HUD STATE
+//
+// Shop/Inventory close buttons are managed
+// internally, so this keeps the bottom help
+// synchronized after clicking X.
+// ======================================================
+
+let lastMenuState = "";
+
+function updateMenuStateWatcher() {
+  const current =
+    [
+      shop.isOpen()
+        ? "shop"
+        : "",
+      inventoryUI.isOpen()
+        ? "inventory"
+        : "",
+      rackPlacement.isActive()
+        ? "placement"
+        : "",
+    ].join("|");
+
+  if (
+    current !==
+    lastMenuState
+  ) {
+    lastMenuState =
+      current;
+
+    updateHUDState();
+  }
+}
 
 // ======================================================
 // RESIZE
@@ -875,7 +895,7 @@ window.addEventListener(
 );
 
 // ======================================================
-// GAME CLOCK
+// CLOCK
 // ======================================================
 
 const clock =
@@ -896,22 +916,42 @@ function animate() {
       0.05
     );
 
-  // Stop player movement while
-  // interacting with shop.
+  // ----------------------------------------------
+  // PLAYER
+  // ----------------------------------------------
 
   if (
-    !shop.isOpen()
+    !anyMenuOpen() &&
+    !rackPlacement.isActive()
   ) {
     player.update(
       delta
     );
   }
 
-  // Mining economy simulation.
+  // ----------------------------------------------
+  // RACK PLACEMENT
+  // ----------------------------------------------
+
+  rackPlacement.update();
+
+  // ----------------------------------------------
+  // ECONOMY
+  // ----------------------------------------------
 
   gameState.update(
     delta
   );
+
+  // ----------------------------------------------
+  // UI
+  // ----------------------------------------------
+
+  updateMenuStateWatcher();
+
+  // ----------------------------------------------
+  // RENDER
+  // ----------------------------------------------
 
   renderer.render(
     scene,
