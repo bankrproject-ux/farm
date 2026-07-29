@@ -5,9 +5,11 @@ import PlayerController from "./game/PlayerController";
 import GameState from "./game/GameState";
 import InventorySystem from "./game/InventorySystem";
 import RackPlacementSystem from "./game/RackPlacementSystem";
+import RackInteractionSystem from "./game/RackInteractionSystem";
 
 import ShopUI from "./ui/ShopUI";
 import InventoryUI from "./ui/InventoryUI";
+import RackManagementUI from "./ui/RackManagementUI";
 
 // ======================================================
 // MINING TYCOON 3D
@@ -239,7 +241,7 @@ scene.add(
 );
 
 // ======================================================
-// BACK WALL
+// WALLS
 // ======================================================
 
 const backWall =
@@ -265,10 +267,6 @@ scene.add(
   backWall
 );
 
-// ======================================================
-// LEFT WALL
-// ======================================================
-
 const leftWall =
   new THREE.Mesh(
     new THREE.BoxGeometry(
@@ -292,10 +290,6 @@ scene.add(
   leftWall
 );
 
-// ======================================================
-// RIGHT WALL
-// ======================================================
-
 const rightWall =
   new THREE.Mesh(
     new THREE.BoxGeometry(
@@ -318,10 +312,6 @@ rightWall.receiveShadow =
 scene.add(
   rightWall
 );
-
-// ======================================================
-// FRONT BEAM
-// ======================================================
 
 const frontBeam =
   new THREE.Mesh(
@@ -573,7 +563,8 @@ function formatHashrate(
     value >= 1000
   ) {
     return `${(
-      value / 1000
+      value /
+      1000
     ).toFixed(2)} GH/s`;
   }
 
@@ -589,7 +580,8 @@ function formatPower(
     value >= 1000
   ) {
     return `${(
-      value / 1000
+      value /
+      1000
     ).toFixed(2)} kW`;
   }
 
@@ -599,7 +591,7 @@ function formatPower(
 }
 
 // ======================================================
-// LIVE GAME STATE HUD
+// GAME STATE HUD
 // ======================================================
 
 gameState.subscribe(
@@ -638,6 +630,87 @@ const shop =
   );
 
 // ======================================================
+// RACK MANAGEMENT
+//
+// Declared before interaction callback is used.
+// ======================================================
+
+const rackManagement =
+  new RackManagementUI(
+    inventory,
+
+    (
+      rack,
+      installedMiner,
+      inventoryItem
+    ) => {
+      console.log(
+        "Miner installed:",
+        {
+          rack:
+            rack.instanceId,
+
+          miner:
+            installedMiner
+              .miner.name,
+
+          minerInstance:
+            installedMiner
+              .instanceId,
+
+          slot:
+            installedMiner
+              .slotIndex,
+
+          inventoryItem:
+            inventoryItem
+              .instanceId,
+        }
+      );
+
+      // Physical miner mesh and global
+      // mining stats are added next.
+    }
+  );
+
+// ======================================================
+// RACK INTERACTION
+// ======================================================
+
+const rackInteraction =
+  new RackInteractionSystem(
+    camera,
+
+    (
+      rack,
+      _object
+    ) => {
+      if (
+        anyMenuOpen()
+      ) {
+        return;
+      }
+
+      if (
+        rackPlacement
+          .isActive()
+      ) {
+        return;
+      }
+
+      rackInteraction.setEnabled(
+        false
+      );
+
+      rackManagement.open(
+        rack
+      );
+
+      updateHUDState();
+    }
+  );
+
+// ======================================================
 // RACK PLACEMENT
 // ======================================================
 
@@ -652,10 +725,17 @@ const rackPlacement =
       rack,
       object
     ) => {
+      // Every newly placed rack becomes
+      // interactable immediately.
+
+      rackInteraction.registerRack(
+        rack,
+        object
+      );
+
       console.log(
         "Rack placed:",
-        rack.instanceId,
-        object.position
+        rack.instanceId
       );
     }
   );
@@ -669,28 +749,51 @@ const inventoryUI =
     inventory,
 
     (rackItem) => {
+      rackInteraction.setEnabled(
+        false
+      );
+
       rackPlacement.start(
         rackItem
       );
+
+      updateHUDState();
     }
   );
 
 // ======================================================
-// UI STATE
+// MENU STATE
 // ======================================================
 
 function anyMenuOpen():
   boolean {
   return (
     shop.isOpen() ||
-    inventoryUI.isOpen()
+    inventoryUI.isOpen() ||
+    rackManagement.isOpen()
   );
 }
 
+// ======================================================
+// INTERACTION STATE
+// ======================================================
+
+function updateInteractionState() {
+  const shouldEnable =
+    !anyMenuOpen() &&
+    !rackPlacement.isActive();
+
+  rackInteraction.setEnabled(
+    shouldEnable
+  );
+}
+
+// ======================================================
+// HUD STATE
+// ======================================================
+
 function updateHUDState() {
-  if (
-    crosshair
-  ) {
+  if (crosshair) {
     crosshair.style.display =
       anyMenuOpen()
         ? "none"
@@ -720,6 +823,15 @@ function updateHUDState() {
   }
 
   if (
+    rackManagement.isOpen()
+  ) {
+    help.textContent =
+      "RACK MANAGEMENT";
+
+    return;
+  }
+
+  if (
     rackPlacement.isActive()
   ) {
     help.textContent =
@@ -732,7 +844,7 @@ function updateHUDState() {
     player.isPointerLocked()
   ) {
     help.textContent =
-      "WASD MOVE  •  B SHOP  •  I INVENTORY  •  ESC RELEASE";
+      "WASD MOVE  •  B SHOP  •  I INVENTORY  •  E INTERACT  •  ESC RELEASE";
 
     return;
   }
@@ -749,14 +861,12 @@ window.addEventListener(
   "keydown",
   (event) => {
     if (
-      event.code !== "KeyB" ||
+      event.code !==
+        "KeyB" ||
       event.repeat
     ) {
       return;
     }
-
-    // Don't open shop during
-    // rack placement.
 
     if (
       rackPlacement.isActive()
@@ -764,7 +874,11 @@ window.addEventListener(
       return;
     }
 
-    // Close inventory first.
+    if (
+      rackManagement.isOpen()
+    ) {
+      return;
+    }
 
     if (
       inventoryUI.isOpen()
@@ -773,6 +887,8 @@ window.addEventListener(
     }
 
     shop.toggle();
+
+    updateInteractionState();
 
     setTimeout(
       updateHUDState,
@@ -789,14 +905,12 @@ window.addEventListener(
   "keydown",
   (event) => {
     if (
-      event.code !== "KeyI" ||
+      event.code !==
+        "KeyI" ||
       event.repeat
     ) {
       return;
     }
-
-    // Don't open inventory
-    // during placement.
 
     if (
       rackPlacement.isActive()
@@ -804,7 +918,11 @@ window.addEventListener(
       return;
     }
 
-    // Close shop first.
+    if (
+      rackManagement.isOpen()
+    ) {
+      return;
+    }
 
     if (
       shop.isOpen()
@@ -814,10 +932,62 @@ window.addEventListener(
 
     inventoryUI.toggle();
 
+    updateInteractionState();
+
     setTimeout(
       updateHUDState,
       0
     );
+  }
+);
+
+// ======================================================
+// ESCAPE MENU HANDLING
+// ======================================================
+
+window.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.code !==
+      "Escape"
+    ) {
+      return;
+    }
+
+    if (
+      rackManagement.isOpen()
+    ) {
+      rackManagement.close();
+
+      updateInteractionState();
+
+      updateHUDState();
+
+      return;
+    }
+
+    if (
+      inventoryUI.isOpen()
+    ) {
+      inventoryUI.close();
+
+      updateInteractionState();
+
+      updateHUDState();
+
+      return;
+    }
+
+    if (
+      shop.isOpen()
+    ) {
+      shop.close();
+
+      updateInteractionState();
+
+      updateHUDState();
+    }
   }
 );
 
@@ -833,38 +1003,47 @@ document.addEventListener(
 );
 
 // ======================================================
-// PERIODIC HUD STATE
+// UI STATE WATCHER
 //
-// Shop/Inventory close buttons are managed
-// internally, so this keeps the bottom help
-// synchronized after clicking X.
+// Also handles X buttons inside UI classes.
 // ======================================================
 
-let lastMenuState = "";
+let lastUIState =
+  "";
 
-function updateMenuStateWatcher() {
+function updateUIStateWatcher() {
   const current =
     [
       shop.isOpen()
         ? "shop"
         : "",
+
       inventoryUI.isOpen()
         ? "inventory"
         : "",
+
+      rackManagement.isOpen()
+        ? "rack"
+        : "",
+
       rackPlacement.isActive()
         ? "placement"
         : "",
     ].join("|");
 
   if (
-    current !==
-    lastMenuState
+    current ===
+    lastUIState
   ) {
-    lastMenuState =
-      current;
-
-    updateHUDState();
+    return;
   }
+
+  lastUIState =
+    current;
+
+  updateInteractionState();
+
+  updateHUDState();
 }
 
 // ======================================================
@@ -917,7 +1096,7 @@ function animate() {
     );
 
   // ----------------------------------------------
-  // PLAYER
+  // PLAYER MOVEMENT
   // ----------------------------------------------
 
   if (
@@ -936,6 +1115,17 @@ function animate() {
   rackPlacement.update();
 
   // ----------------------------------------------
+  // RACK TARGETING
+  // ----------------------------------------------
+
+  if (
+    !anyMenuOpen() &&
+    !rackPlacement.isActive()
+  ) {
+    rackInteraction.update();
+  }
+
+  // ----------------------------------------------
   // ECONOMY
   // ----------------------------------------------
 
@@ -947,7 +1137,7 @@ function animate() {
   // UI
   // ----------------------------------------------
 
-  updateMenuStateWatcher();
+  updateUIStateWatcher();
 
   // ----------------------------------------------
   // RENDER
