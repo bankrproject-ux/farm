@@ -2,47 +2,82 @@ import * as THREE from "three";
 import "./style.css";
 
 import PlayerController from "./game/PlayerController";
+import GameState from "./game/GameState";
+import InventorySystem from "./game/InventorySystem";
+import ShopUI from "./ui/ShopUI";
 
 // ======================================================
 // MINING TYCOON 3D
 // Main Entry Point
 // ======================================================
 
-const app = document.querySelector<HTMLDivElement>("#app");
+const app =
+  document.querySelector<HTMLDivElement>(
+    "#app"
+  );
 
 if (!app) {
-  throw new Error("App element not found.");
+  throw new Error(
+    "App element not found."
+  );
 }
+
+// ======================================================
+// CORE GAME SYSTEMS
+// ======================================================
+
+const gameState =
+  new GameState();
+
+const inventory =
+  new InventorySystem();
 
 // ======================================================
 // SCENE
 // ======================================================
 
-const scene = new THREE.Scene();
+const scene =
+  new THREE.Scene();
 
-scene.background = new THREE.Color(0x080b10);
-scene.fog = new THREE.Fog(0x080b10, 18, 55);
+scene.background =
+  new THREE.Color(
+    0x080b10
+  );
+
+scene.fog =
+  new THREE.Fog(
+    0x080b10,
+    18,
+    55
+  );
 
 // ======================================================
 // CAMERA
 // ======================================================
 
-const camera = new THREE.PerspectiveCamera(
-  70,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  100
-);
+const camera =
+  new THREE.PerspectiveCamera(
+    70,
+    window.innerWidth /
+      window.innerHeight,
+    0.1,
+    100
+  );
 
-camera.position.set(0, 1.7, 7);
+camera.position.set(
+  0,
+  1.7,
+  7
+);
 
 // ======================================================
 // RENDERER
 // ======================================================
 
-const renderer = new THREE.WebGLRenderer({
-  antialias: true,
-});
+const renderer =
+  new THREE.WebGLRenderer({
+    antialias: true,
+  });
 
 renderer.setSize(
   window.innerWidth,
@@ -50,10 +85,14 @@ renderer.setSize(
 );
 
 renderer.setPixelRatio(
-  Math.min(window.devicePixelRatio, 2)
+  Math.min(
+    window.devicePixelRatio,
+    2
+  )
 );
 
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled =
+  true;
 
 renderer.shadowMap.type =
   THREE.PCFSoftShadowMap;
@@ -64,12 +103,15 @@ renderer.outputColorSpace =
 renderer.toneMapping =
   THREE.ACESFilmicToneMapping;
 
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure =
+  1.15;
 
-app.appendChild(renderer.domElement);
+app.appendChild(
+  renderer.domElement
+);
 
 // ======================================================
-// PLAYER CONTROLLER
+// PLAYER
 // ======================================================
 
 const player =
@@ -88,7 +130,9 @@ const ambientLight =
     0.7
   );
 
-scene.add(ambientLight);
+scene.add(
+  ambientLight
+);
 
 const mainLight =
   new THREE.DirectionalLight(
@@ -102,16 +146,19 @@ mainLight.position.set(
   5
 );
 
-mainLight.castShadow = true;
+mainLight.castShadow =
+  true;
 
 mainLight.shadow.mapSize.set(
   2048,
   2048
 );
 
-scene.add(mainLight);
+scene.add(
+  mainLight
+);
 
-// Industrial blue accent.
+// Blue industrial accent.
 
 const blueLight =
   new THREE.PointLight(
@@ -126,7 +173,27 @@ blueLight.position.set(
   -4
 );
 
-scene.add(blueLight);
+scene.add(
+  blueLight
+);
+
+// ======================================================
+// MATERIALS
+// ======================================================
+
+const wallMaterial =
+  new THREE.MeshStandardMaterial({
+    color: 0x171c23,
+    roughness: 0.82,
+    metalness: 0.08,
+  });
+
+const floorMaterial =
+  new THREE.MeshStandardMaterial({
+    color: 0x242a32,
+    roughness: 0.72,
+    metalness: 0.18,
+  });
 
 // ======================================================
 // FLOOR
@@ -138,20 +205,18 @@ const floor =
       20,
       20
     ),
-
-    new THREE.MeshStandardMaterial({
-      color: 0x242a32,
-      roughness: 0.72,
-      metalness: 0.18,
-    })
+    floorMaterial
   );
 
 floor.rotation.x =
   -Math.PI / 2;
 
-floor.receiveShadow = true;
+floor.receiveShadow =
+  true;
 
-scene.add(floor);
+scene.add(
+  floor
+);
 
 // ======================================================
 // FLOOR GRID
@@ -165,20 +230,12 @@ const grid =
     0x303944
   );
 
-grid.position.y = 0.003;
+grid.position.y =
+  0.003;
 
-scene.add(grid);
-
-// ======================================================
-// WALL MATERIAL
-// ======================================================
-
-const wallMaterial =
-  new THREE.MeshStandardMaterial({
-    color: 0x171c23,
-    roughness: 0.82,
-    metalness: 0.08,
-  });
+scene.add(
+  grid
+);
 
 // ======================================================
 // BACK WALL
@@ -200,9 +257,12 @@ backWall.position.set(
   -10
 );
 
-backWall.receiveShadow = true;
+backWall.receiveShadow =
+  true;
 
-scene.add(backWall);
+scene.add(
+  backWall
+);
 
 // ======================================================
 // LEFT WALL
@@ -224,9 +284,12 @@ leftWall.position.set(
   0
 );
 
-leftWall.receiveShadow = true;
+leftWall.receiveShadow =
+  true;
 
-scene.add(leftWall);
+scene.add(
+  leftWall
+);
 
 // ======================================================
 // RIGHT WALL
@@ -248,15 +311,15 @@ rightWall.position.set(
   0
 );
 
-rightWall.receiveShadow = true;
+rightWall.receiveShadow =
+  true;
 
-scene.add(rightWall);
+scene.add(
+  rightWall
+);
 
 // ======================================================
-// FRONT WALL DETAILS
-//
-// Front is intentionally open for now.
-// Later this can become the facility entrance.
+// FRONT TOP BEAM
 // ======================================================
 
 const frontBeam =
@@ -275,7 +338,9 @@ frontBeam.position.set(
   9.8
 );
 
-scene.add(frontBeam);
+scene.add(
+  frontBeam
+);
 
 // ======================================================
 // CEILING
@@ -299,11 +364,15 @@ const ceiling =
 ceiling.rotation.x =
   Math.PI / 2;
 
-ceiling.position.y = 5;
+ceiling.position.y =
+  5;
 
-ceiling.receiveShadow = true;
+ceiling.receiveShadow =
+  true;
 
-scene.add(ceiling);
+scene.add(
+  ceiling
+);
 
 // ======================================================
 // CEILING LIGHTS
@@ -334,7 +403,9 @@ function createCeilingLight(
     z
   );
 
-  scene.add(fixture);
+  scene.add(
+    fixture
+  );
 
   const light =
     new THREE.PointLight(
@@ -349,7 +420,9 @@ function createCeilingLight(
     z
   );
 
-  scene.add(light);
+  scene.add(
+    light
+  );
 }
 
 createCeilingLight(
@@ -373,10 +446,15 @@ createCeilingLight(
 );
 
 // ======================================================
-// TEMPORARY SERVER RACK
+// TEMPORARY DISPLAY RACK
+//
+// This rack is ONLY scenery.
+// It is not owned by the player and does not mine.
+//
+// Later we remove this once rack placement is working.
 // ======================================================
 
-const rack =
+const displayRack =
   new THREE.Group();
 
 const rackFrameMaterial =
@@ -396,14 +474,15 @@ const rackBody =
     rackFrameMaterial
   );
 
-rackBody.castShadow = true;
-rackBody.receiveShadow = true;
+rackBody.castShadow =
+  true;
 
-rack.add(rackBody);
+rackBody.receiveShadow =
+  true;
 
-// ======================================================
-// SERVER SLOTS
-// ======================================================
+displayRack.add(
+  rackBody
+);
 
 const slotMaterial =
   new THREE.MeshStandardMaterial({
@@ -436,11 +515,14 @@ for (
 
   slot.position.set(
     0,
-    -1.15 + i * 0.33,
+    -1.15 +
+      i * 0.33,
     0.565
   );
 
-  rack.add(slot);
+  displayRack.add(
+    slot
+  );
 
   const led =
     new THREE.Mesh(
@@ -454,34 +536,45 @@ for (
 
   led.position.set(
     0.5,
-    -1.15 + i * 0.33,
+    -1.15 +
+      i * 0.33,
     0.62
   );
 
-  rack.add(led);
+  displayRack.add(
+    led
+  );
 }
 
-rack.position.set(
+displayRack.position.set(
   0,
   1.6,
   -6
 );
 
-scene.add(rack);
+scene.add(
+  displayRack
+);
 
 // ======================================================
 // HUD
 // ======================================================
 
 const hud =
-  document.createElement("div");
+  document.createElement(
+    "div"
+  );
 
-hud.className = "hud";
+hud.className =
+  "hud";
 
 hud.innerHTML = `
   <div class="game-title">
     MINING TYCOON
-    <span>FACILITY 01</span>
+
+    <span>
+      FACILITY 01
+    </span>
   </div>
 
   <div class="stats">
@@ -490,8 +583,10 @@ hud.innerHTML = `
         BALANCE
       </span>
 
-      <strong>
-        $5,000
+      <strong
+        data-hud="balance"
+      >
+        $5,000.00
       </strong>
     </div>
 
@@ -500,8 +595,10 @@ hud.innerHTML = `
         HASHRATE
       </span>
 
-      <strong>
-        0 H/s
+      <strong
+        data-hud="hashrate"
+      >
+        0 MH/s
       </strong>
     </div>
 
@@ -510,25 +607,178 @@ hud.innerHTML = `
         POWER
       </span>
 
-      <strong>
+      <strong
+        data-hud="power"
+      >
         0 W
       </strong>
     </div>
   </div>
 
-  <div class="crosshair"></div>
+  <div class="crosshair">
+  </div>
 
   <div class="help">
     CLICK TO ENTER FACILITY
   </div>
 `;
 
-app.appendChild(hud);
+app.appendChild(
+  hud
+);
+
+// ======================================================
+// HUD ELEMENT REFERENCES
+// ======================================================
+
+const balanceHUD =
+  hud.querySelector<HTMLElement>(
+    '[data-hud="balance"]'
+  );
+
+const hashrateHUD =
+  hud.querySelector<HTMLElement>(
+    '[data-hud="hashrate"]'
+  );
+
+const powerHUD =
+  hud.querySelector<HTMLElement>(
+    '[data-hud="power"]'
+  );
 
 const help =
   hud.querySelector<HTMLDivElement>(
     ".help"
   );
+
+const crosshair =
+  hud.querySelector<HTMLDivElement>(
+    ".crosshair"
+  );
+
+// ======================================================
+// FORMATTERS
+// ======================================================
+
+function formatMoney(
+  value: number
+): string {
+  return new Intl.NumberFormat(
+    "en-US",
+    {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }
+  ).format(value);
+}
+
+function formatHashrate(
+  value: number
+): string {
+  if (
+    value >= 1_000_000
+  ) {
+    return `${(
+      value /
+      1_000_000
+    ).toFixed(2)} TH/s`;
+  }
+
+  if (
+    value >= 1000
+  ) {
+    return `${(
+      value / 1000
+    ).toFixed(2)} GH/s`;
+  }
+
+  return `${value.toFixed(
+    0
+  )} MH/s`;
+}
+
+function formatPower(
+  value: number
+): string {
+  if (
+    value >= 1000
+  ) {
+    return `${(
+      value / 1000
+    ).toFixed(2)} kW`;
+  }
+
+  return `${value.toFixed(
+    0
+  )} W`;
+}
+
+// ======================================================
+// LIVE HUD
+// ======================================================
+
+gameState.subscribe(
+  (state) => {
+    if (balanceHUD) {
+      balanceHUD.textContent =
+        formatMoney(
+          state.getBalance()
+        );
+    }
+
+    if (hashrateHUD) {
+      hashrateHUD.textContent =
+        formatHashrate(
+          state.getHashrate()
+        );
+    }
+
+    if (powerHUD) {
+      powerHUD.textContent =
+        formatPower(
+          state.getPowerUsage()
+        );
+    }
+  }
+);
+
+// ======================================================
+// SHOP
+// ======================================================
+
+const shop =
+  new ShopUI(
+    gameState,
+    inventory
+  );
+
+// ======================================================
+// SHOP KEY
+//
+// B = Hardware Market
+// ======================================================
+
+window.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.code !==
+      "KeyB"
+    ) {
+      return;
+    }
+
+    if (
+      event.repeat
+    ) {
+      return;
+    }
+
+    shop.toggle();
+  }
+);
 
 // ======================================================
 // POINTER LOCK UI
@@ -541,12 +791,58 @@ document.addEventListener(
       return;
     }
 
-    if (player.isPointerLocked()) {
+    if (
+      player.isPointerLocked()
+    ) {
       help.textContent =
-        "WASD MOVE  •  MOUSE LOOK  •  ESC RELEASE";
+        "WASD MOVE  •  B SHOP  •  ESC RELEASE";
     } else {
-      help.textContent =
-        "CLICK TO ENTER FACILITY";
+      if (
+        shop.isOpen()
+      ) {
+        help.textContent =
+          "HARDWARE MARKET";
+      } else {
+        help.textContent =
+          "CLICK TO ENTER  •  B HARDWARE MARKET";
+      }
+    }
+  }
+);
+
+// ======================================================
+// SHOP UI VISUAL STATE
+// ======================================================
+
+window.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.code ===
+      "KeyB"
+    ) {
+      setTimeout(
+        () => {
+          if (
+            crosshair
+          ) {
+            crosshair.style.display =
+              shop.isOpen()
+                ? "none"
+                : "";
+          }
+
+          if (
+            help
+          ) {
+            help.textContent =
+              shop.isOpen()
+                ? "HARDWARE MARKET"
+                : "CLICK TO ENTER  •  B HARDWARE MARKET";
+          }
+        },
+        0
+      );
     }
   }
 );
@@ -600,7 +896,22 @@ function animate() {
       0.05
     );
 
-  player.update(delta);
+  // Stop player movement while
+  // interacting with shop.
+
+  if (
+    !shop.isOpen()
+  ) {
+    player.update(
+      delta
+    );
+  }
+
+  // Mining economy simulation.
+
+  gameState.update(
+    delta
+  );
 
   renderer.render(
     scene,
