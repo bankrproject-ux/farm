@@ -9,7 +9,11 @@ import type {
 // MINING TYCOON 3D
 // MINER VISUAL SYSTEM
 //
-// Creates physical mining-server meshes inside racks.
+// Creates physical mining servers inside placed racks.
+// Rack local origin:
+// X = center
+// Y = FLOOR / bottom of rack
+// Z+ = front of rack
 // ======================================================
 
 type RackVisualEntry = {
@@ -48,8 +52,6 @@ export default class MinerVisualSystem {
 
   // ====================================================
   // REGISTER RACK
-  //
-  // Main.ts calls this when a rack has been placed.
   // ====================================================
 
   public registerRack(
@@ -64,10 +66,7 @@ export default class MinerVisualSystem {
       }
     );
 
-    // If rack already contains miners
-    // later when save/load exists,
-    // recreate their visuals.
-
+    // Useful later for save/load.
     for (
       const installedMiner
       of rack.miners
@@ -102,36 +101,7 @@ export default class MinerVisualSystem {
   }
 
   // ====================================================
-  // REMOVE MINER
-  //
-  // Prepared for future uninstall/sell functionality.
-  // ====================================================
-
-  public removeMiner(
-    instanceId: string
-  ) {
-    const entry =
-      this.miners.get(
-        instanceId
-      );
-
-    if (!entry) {
-      return;
-    }
-
-    entry.object.removeFromParent();
-
-    this.disposeObject(
-      entry.object
-    );
-
-    this.miners.delete(
-      instanceId
-    );
-  }
-
-  // ====================================================
-  // CREATE MINER VISUAL
+  // CREATE MINER
   // ====================================================
 
   private createMinerVisual(
@@ -145,7 +115,7 @@ export default class MinerVisualSystem {
 
     if (!rackEntry) {
       console.warn(
-        "MinerVisualSystem: rack not registered:",
+        "MinerVisualSystem: rack not registered",
         rack.instanceId
       );
 
@@ -167,26 +137,7 @@ export default class MinerVisualSystem {
       rackEntry.rackObject;
 
     // ==================================================
-    // SERVER GROUP
-    // ==================================================
-
-    const server =
-      new THREE.Group();
-
-    server.name =
-      `miner-${installedMiner.instanceId}`;
-
-    server.userData.minerInstanceId =
-      installedMiner.instanceId;
-
-    server.userData.rackInstanceId =
-      rack.instanceId;
-
-    // ==================================================
-    // SIZE
-    //
-    // Rack visuals currently use game-world dimensions,
-    // so server dimensions are derived from rack size.
+    // RACK DIMENSIONS
     // ==================================================
 
     const rackWidth =
@@ -198,32 +149,57 @@ export default class MinerVisualSystem {
     const rackDepth =
       rack.definition.depth;
 
+    const totalSlots =
+      rack.definition.totalSlots;
+
     const slotHeight =
       rackHeight /
-      rack.definition.totalSlots;
+      totalSlots;
+
+    // ==================================================
+    // SERVER DIMENSIONS
+    // ==================================================
+
+    const serverWidth =
+      rackWidth * 0.72;
+
+    const occupiedHeight =
+      slotHeight *
+      miner.rackSlots;
 
     const serverHeight =
       Math.max(
-        slotHeight *
-          miner.rackSlots *
-          0.82,
+        occupiedHeight * 0.78,
         0.08
       );
-
-    const serverWidth =
-      rackWidth * 0.76;
 
     const serverDepth =
       rackDepth * 0.72;
 
     // ==================================================
-    // SERVER BODY
+    // SERVER GROUP
+    // ==================================================
+
+    const server =
+      new THREE.Group();
+
+    server.name =
+      `miner_${installedMiner.instanceId}`;
+
+    server.userData.minerInstanceId =
+      installedMiner.instanceId;
+
+    server.userData.rackInstanceId =
+      rack.instanceId;
+
+    // ==================================================
+    // BODY
     // ==================================================
 
     const bodyMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x111820,
-        roughness: 0.38,
+        color: 0x18212b,
+        roughness: 0.32,
         metalness: 0.82,
       });
 
@@ -248,58 +224,57 @@ export default class MinerVisualSystem {
     );
 
     // ==================================================
-    // FRONT PANEL
+    // FRONT FACE
+    //
+    // RackPlacementSystem uses +Z as rack front.
     // ==================================================
 
     const frontMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x080c11,
-        roughness: 0.3,
+        color: 0x05080c,
+        roughness: 0.25,
         metalness: 0.9,
       });
 
     const front =
       new THREE.Mesh(
         new THREE.BoxGeometry(
-          serverWidth * 0.96,
-          serverHeight * 0.78,
-          0.035
+          serverWidth * 0.97,
+          serverHeight * 0.82,
+          0.04
         ),
         frontMaterial
       );
 
     front.position.z =
       serverDepth / 2 +
-      0.019;
+      0.022;
 
     server.add(
       front
     );
 
     // ==================================================
-    // FRONT VENTS
+    // VENT AREA
     // ==================================================
 
     const ventMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x242d37,
-        roughness: 0.65,
-        metalness: 0.7,
+        color: 0x273441,
+        roughness: 0.48,
+        metalness: 0.75,
       });
 
     const ventCount =
       Math.max(
-        3,
-        Math.min(
-          8,
-          miner.rackSlots * 3
-        )
+        4,
+        miner.rackSlots * 4
       );
 
     const ventAreaWidth =
       serverWidth * 0.52;
 
-    const ventSpacing =
+    const ventWidth =
       ventAreaWidth /
       ventCount;
 
@@ -311,8 +286,8 @@ export default class MinerVisualSystem {
       const vent =
         new THREE.Mesh(
           new THREE.BoxGeometry(
-            ventSpacing * 0.52,
-            serverHeight * 0.36,
+            ventWidth * 0.48,
+            serverHeight * 0.42,
             0.012
           ),
           ventMaterial
@@ -320,11 +295,13 @@ export default class MinerVisualSystem {
 
       vent.position.set(
         -ventAreaWidth / 2 +
-          ventSpacing / 2 +
-          i * ventSpacing,
+          ventWidth / 2 +
+          i * ventWidth,
+
         0,
+
         serverDepth / 2 +
-          0.041
+          0.046
       );
 
       server.add(
@@ -333,55 +310,114 @@ export default class MinerVisualSystem {
     }
 
     // ==================================================
-    // LED
+    // LEFT HANDLE
     // ==================================================
 
-    const ledColor =
-      installedMiner.powered
-        ? 0x39ff88
-        : 0x5b626b;
-
-    const ledMaterial =
+    const handleMaterial =
       new THREE.MeshStandardMaterial({
-        color: ledColor,
+        color: 0x45515e,
+        roughness: 0.3,
+        metalness: 0.9,
+      });
+
+    const handleHeight =
+      Math.max(
+        serverHeight * 0.48,
+        0.035
+      );
+
+    const leftHandle =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          serverWidth * 0.055,
+          handleHeight,
+          0.025
+        ),
+        handleMaterial
+      );
+
+    leftHandle.position.set(
+      -serverWidth * 0.4,
+      0,
+      serverDepth / 2 +
+        0.05
+    );
+
+    server.add(
+      leftHandle
+    );
+
+    // ==================================================
+    // RIGHT HANDLE
+    // ==================================================
+
+    const rightHandle =
+      leftHandle.clone();
+
+    rightHandle.position.x =
+      serverWidth * 0.4;
+
+    server.add(
+      rightHandle
+    );
+
+    // ==================================================
+    // POWER LED
+    // ==================================================
+
+    const powerColor =
+      installedMiner.powered
+        ? 0x45ff8a
+        : 0x3b4148;
+
+    const powerLEDMaterial =
+      new THREE.MeshStandardMaterial({
+        color:
+          powerColor,
 
         emissive:
           installedMiner.powered
-            ? 0x22ff77
+            ? 0x20ff6d
             : 0x000000,
 
         emissiveIntensity:
           installedMiner.powered
-            ? 4
+            ? 5
             : 0,
       });
 
-    const led =
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          Math.max(
-            0.018,
-            rackWidth * 0.018
-          ),
-          10,
-          10
-        ),
-        ledMaterial
+    const ledRadius =
+      Math.max(
+        0.012,
+        Math.min(
+          0.025,
+          serverHeight * 0.13
+        )
       );
 
-    led.position.set(
-      serverWidth * 0.36,
+    const powerLED =
+      new THREE.Mesh(
+        new THREE.SphereGeometry(
+          ledRadius,
+          12,
+          12
+        ),
+        powerLEDMaterial
+      );
+
+    powerLED.position.set(
+      serverWidth * 0.32,
       0,
       serverDepth / 2 +
-        0.055
+        0.07
     );
 
     server.add(
-      led
+      powerLED
     );
 
     // ==================================================
-    // SECOND LED
+    // ACTIVITY LED
     // ==================================================
 
     if (
@@ -389,29 +425,26 @@ export default class MinerVisualSystem {
     ) {
       const activityMaterial =
         new THREE.MeshStandardMaterial({
-          color: 0x3d9cff,
+          color: 0x45a3ff,
           emissive: 0x1677ff,
-          emissiveIntensity: 3,
+          emissiveIntensity: 5,
         });
 
       const activityLED =
         new THREE.Mesh(
           new THREE.SphereGeometry(
-            Math.max(
-              0.012,
-              rackWidth * 0.012
-            ),
-            8,
-            8
+            ledRadius * 0.72,
+            10,
+            10
           ),
           activityMaterial
         );
 
       activityLED.position.set(
-        serverWidth * 0.29,
+        serverWidth * 0.25,
         0,
         serverDepth / 2 +
-          0.055
+          0.07
       );
 
       server.add(
@@ -425,9 +458,9 @@ export default class MinerVisualSystem {
 
     const railMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x303b47,
-        roughness: 0.35,
-        metalness: 0.85,
+        color: 0x354452,
+        roughness: 0.3,
+        metalness: 0.9,
       });
 
     const leftRail =
@@ -435,7 +468,7 @@ export default class MinerVisualSystem {
         new THREE.BoxGeometry(
           0.035,
           serverHeight * 0.92,
-          serverDepth * 0.9
+          serverDepth * 0.92
         ),
         railMaterial
       );
@@ -462,42 +495,53 @@ export default class MinerVisualSystem {
     // ==================================================
     // POSITION INSIDE RACK
     //
-    // slotIndex 0 starts at the bottom of the rack.
+    // IMPORTANT:
     //
-    // We calculate the center of however many U
-    // the miner occupies.
+    // RackPlacementSystem creates rack from:
+    //
+    // y = 0
+    // to
+    // y = rackHeight
+    //
+    // NOT:
+    //
+    // -rackHeight / 2
+    // to
+    // +rackHeight / 2
+    //
+    // slotIndex 0 therefore starts at floor/bottom.
     // ==================================================
 
-    const occupiedHeight =
-      slotHeight *
-      miner.rackSlots;
-
-    const bottomY =
-      -rackHeight / 2;
-
-    const slotStartY =
-      bottomY +
+    const slotBottom =
       installedMiner.slotIndex *
-        slotHeight;
+      slotHeight;
 
     const centerY =
-      slotStartY +
+      slotBottom +
       occupiedHeight / 2;
+
+    // ==================================================
+    // FRONT POSITION
+    //
+    // Empty slot bars are around:
+    //
+    // +rackDepth / 2
+    //
+    // Put server slightly behind them but still
+    // clearly visible from the front.
+    // ==================================================
+
+    const centerZ =
+      0.02;
 
     server.position.set(
       0,
       centerY,
-      0
+      centerZ
     );
 
     // ==================================================
     // ADD TO RACK
-    //
-    // Important:
-    // add to rackObject rather than scene directly.
-    //
-    // This means rack rotation/position automatically
-    // applies to installed miners.
     // ==================================================
 
     rackObject.add(
@@ -520,6 +564,69 @@ export default class MinerVisualSystem {
         object:
           server,
       }
+    );
+
+    console.log(
+      "Miner visual created:",
+      {
+        miner:
+          miner.name,
+
+        rack:
+          rack.definition.name,
+
+        slot:
+          installedMiner.slotIndex,
+
+        position: {
+          x:
+            server.position.x,
+
+          y:
+            server.position.y,
+
+          z:
+            server.position.z,
+        },
+
+        size: {
+          width:
+            serverWidth,
+
+          height:
+            serverHeight,
+
+          depth:
+            serverDepth,
+        },
+      }
+    );
+  }
+
+  // ====================================================
+  // REMOVE MINER
+  // ====================================================
+
+  public removeMiner(
+    instanceId: string
+  ) {
+    const entry =
+      this.miners.get(
+        instanceId
+      );
+
+    if (!entry) {
+      return;
+    }
+
+    entry.object.removeFromParent();
+
+    this.disposeObject(
+      entry.object
+    );
+
+    this.miners.delete(
+      instanceId
     );
   }
 
@@ -554,7 +661,7 @@ export default class MinerVisualSystem {
   }
 
   // ====================================================
-  // DISPOSE
+  // DISPOSE OBJECT
   // ====================================================
 
   private disposeObject(
@@ -563,32 +670,30 @@ export default class MinerVisualSystem {
     object.traverse(
       (child) => {
         if (
-          !(child instanceof THREE.Mesh)
+          !(
+            child instanceof
+            THREE.Mesh
+          )
         ) {
           return;
         }
 
         child.geometry.dispose();
 
-        const material =
-          child.material;
-
         if (
           Array.isArray(
-            material
+            child.material
           )
         ) {
           for (
-            const item
-            of material
+            const material
+            of child.material
           ) {
-            item.dispose();
+            material.dispose();
           }
-
-          return;
+        } else {
+          child.material.dispose();
         }
-
-        material.dispose();
       }
     );
   }
@@ -613,8 +718,6 @@ export default class MinerVisualSystem {
 
     this.racks.clear();
 
-    // Kept here so this system can later own
-    // scene-level effects without changing API.
     void this.scene;
   }
 }
