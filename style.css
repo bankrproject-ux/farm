@@ -11,15 +11,13 @@ body {
   padding: 20px;
 }
 
-#farm-root {
-  width: 100%;
-  max-width: 960px;
-}
+#farm-root { width: 100%; max-width: 900px; }
 
 #farm-root .title {
-  font-family: 'Fredoka', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  color: #F7EFDD;
+  letter-spacing: 1px;
 }
 
 #farm-hud {
@@ -27,34 +25,36 @@ body {
   align-items: center;
   justify-content: space-between;
   background: linear-gradient(180deg, #4A6741, #3D5233);
-  color: #F7EFDD;
-  border-radius: 16px;
+  border: 3px solid #2A3A24;
+  border-radius: 4px;
   padding: 12px 18px;
   margin-bottom: 10px;
-  box-shadow: 0 4px 0 #2A3A24, 0 8px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 0 #2A3A24;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-#farm-hud .stats {
-  display: flex;
-  gap: 16px;
-}
+#farm-hud .stats { display: flex; gap: 10px; flex-wrap: wrap; }
 
 #farm-hud .stat {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-weight: 800;
-  font-size: 14px;
-  background: rgba(0,0,0,0.15);
-  padding: 4px 10px;
-  border-radius: 999px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #F7EFDD;
+  background: rgba(0,0,0,0.25);
+  padding: 6px 8px;
+  border-radius: 3px;
+  border: 2px solid rgba(0,0,0,0.3);
 }
 
 #farm-canvas-wrap {
   position: relative;
-  border-radius: 18px;
+  border-radius: 4px;
   overflow: hidden;
-  box-shadow: inset 0 0 0 5px #5C7A46, 0 12px 30px rgba(0,0,0,0.25);
+  border: 4px solid #2A3A24;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
 }
 
 #farm-canvas {
@@ -63,19 +63,23 @@ body {
   height: auto;
   background: #8fb96e;
   cursor: pointer;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
 
 #farm-toast {
   position: absolute;
-  top: 14px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  background: #3D3226;
+  background: #1F1710;
   color: #F7EFDD;
-  padding: 7px 16px;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 13px;
+  padding: 6px 14px;
+  border: 2px solid #000;
+  border-radius: 3px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
   opacity: 0;
   transition: opacity 0.2s ease;
   pointer-events: none;
@@ -86,11 +90,12 @@ body {
   position: absolute;
   display: none;
   background: #FFFDF8;
-  border-radius: 14px;
+  border: 3px solid #2A3A24;
+  border-radius: 4px;
   padding: 8px;
   box-shadow: 0 8px 22px rgba(0,0,0,0.3);
   z-index: 10;
-  width: 180px;
+  width: 170px;
 }
 
 #farm-seedmenu button {
@@ -98,25 +103,19 @@ body {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  border: none;
+  border: 2px solid #2A3A24;
   background: #FDF7EA;
-  border-radius: 10px;
-  padding: 7px 10px;
+  border-radius: 3px;
+  padding: 7px 8px;
   margin-bottom: 6px;
   cursor: pointer;
   font-family: 'Nunito', sans-serif;
-  font-size: 12.5px;
-  font-weight: 700;
-  transition: transform 0.1s ease;
+  font-size: 12px;
+  font-weight: 800;
 }
 
-#farm-seedmenu button:hover:not(:disabled) { transform: scale(1.03); background: #F5E9CE; }
+#farm-seedmenu button:hover:not(:disabled) { background: #F5E9CE; }
 #farm-seedmenu button:last-child { margin-bottom: 0; }
 #farm-seedmenu button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-#farm-hint {
-  text-align: center;
-  font-size: 12.5px;
-  color: #435235;
-  margin-top: 8px;
-}
+#farm-hint { text-align: center; font-size: 12.5px; color: #435235; margin-top: 8px; }
