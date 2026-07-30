@@ -15,21 +15,16 @@ import type {
 // - Facility electrical capacity
 // - Power source registration
 // - Miner power allocation
-// - Rack power state
 // - Automatic overload handling
 //
 // IMPORTANT:
 //
-// Rack maxPower and Facility power are different.
+// Electricity is controlled by FACILITY CAPACITY.
 //
-// Rack maxPower:
-// Maximum electrical load supported by that rack.
-//
-// Facility capacity:
-// Electricity actually available from installed
-// power sources.
-//
-// A miner needs BOTH.
+// Rack maxPower is no longer used as a hard limit.
+// Rack capacity is determined by physical U space,
+// while PowerSystem determines whether installed
+// miners actually receive electricity.
 // ======================================================
 
 // ======================================================
@@ -153,8 +148,8 @@ export default class PowerSystem {
       return false;
     }
 
-    // Turn all miners off before removing rack
-    // from the power network.
+    // Turn all miners off before removing
+    // rack from the facility network.
 
     for (
       const installed
@@ -201,14 +196,18 @@ export default class PowerSystem {
   // ====================================================
   // RECALCULATE
   //
-  // Power allocation is deterministic.
+  // Electricity is allocated from total facility
+  // capacity.
   //
-  // Racks receive electricity in registration order.
-  // Miners inside each rack receive electricity in
-  // slot order.
+  // Allocation order:
   //
-  // This gives us predictable behavior when facility
-  // demand becomes larger than available capacity.
+  // 1. Rack registration order
+  // 2. Miner rack slot order
+  //
+  // If facility capacity runs out, remaining miners
+  // stay OFFLINE.
+  //
+  // Rack maxPower is intentionally NOT checked here.
   // ====================================================
 
   public recalculate() {
@@ -216,10 +215,7 @@ export default class PowerSystem {
       this.getTotalCapacity();
 
     // ----------------------------------------------
-    // First turn EVERYTHING off.
-    //
-    // Then electricity is allocated again from
-    // available facility capacity.
+    // FIRST TURN EVERYTHING OFF
     // ----------------------------------------------
 
     for (
@@ -236,7 +232,7 @@ export default class PowerSystem {
     }
 
     // ----------------------------------------------
-    // ALLOCATE POWER
+    // ALLOCATE FACILITY POWER
     // ----------------------------------------------
 
     for (
@@ -250,41 +246,22 @@ export default class PowerSystem {
             b.slotIndex
         );
 
-      let rackAllocatedPower =
-        0;
-
       for (
         const installed
         of sortedMiners
       ) {
-        const miner =
-          installed.miner;
+        const requiredPower =
+          installed.miner
+            .powerUsage;
 
         // ------------------------------------------
-        // RACK LIMIT
+        // FACILITY CAPACITY CHECK
         // ------------------------------------------
 
-        const rackCanHandle =
-          rackAllocatedPower +
-            miner.powerUsage <=
-          rack.definition.maxPower;
-
-        if (!rackCanHandle) {
-          installed.powered =
-            false;
-
-          continue;
-        }
-
-        // ------------------------------------------
-        // FACILITY CAPACITY
-        // ------------------------------------------
-
-        const facilityCanHandle =
-          availablePower >=
-          miner.powerUsage;
-
-        if (!facilityCanHandle) {
+        if (
+          availablePower <
+          requiredPower
+        ) {
           installed.powered =
             false;
 
@@ -298,11 +275,8 @@ export default class PowerSystem {
         installed.powered =
           true;
 
-        rackAllocatedPower +=
-          miner.powerUsage;
-
         availablePower -=
-          miner.powerUsage;
+          requiredPower;
       }
     }
 
@@ -324,7 +298,9 @@ export default class PowerSystem {
       const source
       of this.powerSources.values()
     ) {
-      if (!source.enabled) {
+      if (
+        !source.enabled
+      ) {
         continue;
       }
 
@@ -360,8 +336,8 @@ export default class PowerSystem {
   // ====================================================
   // TOTAL DEMAND
   //
-  // Power required if every installed miner
-  // were turned on.
+  // Electricity required if every installed miner
+  // were powered.
   // ====================================================
 
   public getTotalDemand():
@@ -378,7 +354,8 @@ export default class PowerSystem {
         of rack.miners
       ) {
         total +=
-          installed.miner.powerUsage;
+          installed.miner
+            .powerUsage;
       }
     }
 
@@ -388,7 +365,7 @@ export default class PowerSystem {
   // ====================================================
   // CURRENT POWER USAGE
   //
-  // Only miners that actually received electricity.
+  // Only powered miners count.
   // ====================================================
 
   public getCurrentPowerUsage():
@@ -411,7 +388,8 @@ export default class PowerSystem {
         }
 
         total +=
-          installed.miner.powerUsage;
+          installed.miner
+            .powerUsage;
       }
     }
 
@@ -442,7 +420,8 @@ export default class PowerSystem {
         }
 
         total +=
-          installed.miner.hashRate;
+          installed.miner
+            .hashRate;
       }
     }
 
@@ -489,8 +468,8 @@ export default class PowerSystem {
   // ====================================================
   // OVERLOADED
   //
-  // True means installed mining hardware requires
-  // more electricity than the facility can provide.
+  // True when installed hardware requires more
+  // electricity than the facility can supply.
   // ====================================================
 
   public isOverloaded():
@@ -540,7 +519,8 @@ export default class PowerSystem {
         installed.powered
       ) {
         total +=
-          installed.miner.powerUsage;
+          installed.miner
+            .powerUsage;
       }
     }
 
@@ -574,7 +554,8 @@ export default class PowerSystem {
         installed.powered
       ) {
         total +=
-          installed.miner.hashRate;
+          installed.miner
+            .hashRate;
       }
     }
 
@@ -583,9 +564,6 @@ export default class PowerSystem {
 
   // ====================================================
   // IS RACK POWERED
-  //
-  // Returns true if at least one miner in the rack
-  // currently receives electricity.
   // ====================================================
 
   public isRackPowered(
