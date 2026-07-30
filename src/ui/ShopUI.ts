@@ -20,6 +20,22 @@ import {
 // ======================================================
 // MINING TYCOON 3D
 // SHOP UI
+//
+// IMPORTANT:
+//
+// GameState updates continuously while mining.
+// We MUST NOT rebuild the entire shop every time
+// GameState changes.
+//
+// Otherwise BUY buttons get destroyed/recreated
+// every frame and become impossible to click.
+//
+// GameState updates:
+// - Balance text
+// - Buy button affordability
+//
+// Actual purchases:
+// - Re-render cards once
 // ======================================================
 
 type ShopTab =
@@ -49,10 +65,12 @@ export default class ShopUI {
   private visible =
     false;
 
-  // Prevent render while purchase transaction
-  // is currently being processed.
   private purchasing =
     false;
+
+  // ====================================================
+  // CONSTRUCTOR
+  // ====================================================
 
   constructor(
     gameState: GameState,
@@ -234,7 +252,7 @@ export default class ShopUI {
     );
 
     // ==================================================
-    // CLOSE BUTTON
+    // CLOSE
     // ==================================================
 
     const closeButton =
@@ -303,27 +321,33 @@ export default class ShopUI {
     );
 
     // ==================================================
-    // GAME STATE LISTENER
+    // GAME STATE
+    //
+    // CRITICAL FIX:
+    //
+    // Mining calls GameState listeners continuously.
+    //
+    // DO NOT call this.render() here.
     // ==================================================
 
     this.gameState.subscribe(
       () => {
         this.updateBalance();
 
-        // IMPORTANT:
-        // Don't destroy/recreate shop cards
-        // in the middle of a purchase click.
         if (
           this.visible &&
           !this.purchasing
         ) {
-          this.render();
+          this.updateBuyButtons();
         }
       }
     );
 
     // ==================================================
-    // INVENTORY LISTENER
+    // INVENTORY
+    //
+    // Inventory changes happen much less frequently.
+    // We can safely rebuild cards here.
     // ==================================================
 
     this.inventory.subscribe(
@@ -413,6 +437,54 @@ export default class ShopUI {
   }
 
   // ====================================================
+  // UPDATE BUY BUTTONS
+  //
+  // Updates existing DOM only.
+  //
+  // No card destruction.
+  // No event listener destruction.
+  // ====================================================
+
+  private updateBuyButtons() {
+    const buttons =
+      this.content
+        .querySelectorAll<HTMLButtonElement>(
+          ".shop-buy[data-price]"
+        );
+
+    const balance =
+      this.gameState.getBalance();
+
+    buttons.forEach(
+      (button) => {
+        const price =
+          Number(
+            button.dataset.price
+          );
+
+        if (
+          !Number.isFinite(
+            price
+          )
+        ) {
+          return;
+        }
+
+        const canAfford =
+          balance >= price;
+
+        button.disabled =
+          !canAfford;
+
+        button.textContent =
+          canAfford
+            ? "BUY"
+            : "INSUFFICIENT FUNDS";
+      }
+    );
+  }
+
+  // ====================================================
   // RENDER
   // ====================================================
 
@@ -425,6 +497,9 @@ export default class ShopUI {
       "miners"
     ) {
       this.renderMiners();
+
+      this.updateBuyButtons();
+
       return;
     }
 
@@ -433,10 +508,15 @@ export default class ShopUI {
       "racks"
     ) {
       this.renderRacks();
+
+      this.updateBuyButtons();
+
       return;
     }
 
     this.renderPowerSources();
+
+    this.updateBuyButtons();
   }
 
   // ====================================================
@@ -591,6 +671,7 @@ export default class ShopUI {
         <button
           type="button"
           class="shop-buy"
+          data-price="${miner.price}"
           ${
             canAfford
               ? ""
@@ -644,27 +725,30 @@ export default class ShopUI {
         miner.price
       )
     ) {
+      this.updateBuyButtons();
+
       return;
     }
 
     this.purchasing =
       true;
 
+    let purchased =
+      false;
+
     try {
-      const purchased =
+      purchased =
         this.gameState.spend(
           miner.price
         );
 
       if (
-        !purchased
+        purchased
       ) {
-        return;
+        this.inventory.addMiner(
+          miner
+        );
       }
-
-      this.inventory.addMiner(
-        miner
-      );
     } finally {
       this.purchasing =
         false;
@@ -672,7 +756,13 @@ export default class ShopUI {
 
     this.updateBalance();
 
-    this.render();
+    if (
+      purchased
+    ) {
+      this.render();
+    } else {
+      this.updateBuyButtons();
+    }
   }
 
   // ====================================================
@@ -814,6 +904,7 @@ export default class ShopUI {
         <button
           type="button"
           class="shop-buy"
+          data-price="${rack.price}"
           ${
             canAfford
               ? ""
@@ -867,27 +958,30 @@ export default class ShopUI {
         rack.price
       )
     ) {
+      this.updateBuyButtons();
+
       return;
     }
 
     this.purchasing =
       true;
 
+    let purchased =
+      false;
+
     try {
-      const purchased =
+      purchased =
         this.gameState.spend(
           rack.price
         );
 
       if (
-        !purchased
+        purchased
       ) {
-        return;
+        this.inventory.addRack(
+          rack
+        );
       }
-
-      this.inventory.addRack(
-        rack
-      );
     } finally {
       this.purchasing =
         false;
@@ -895,7 +989,13 @@ export default class ShopUI {
 
     this.updateBalance();
 
-    this.render();
+    if (
+      purchased
+    ) {
+      this.render();
+    } else {
+      this.updateBuyButtons();
+    }
   }
 
   // ====================================================
@@ -1039,6 +1139,7 @@ export default class ShopUI {
         <button
           type="button"
           class="shop-buy"
+          data-price="${source.price}"
           ${
             canAfford
               ? ""
@@ -1093,27 +1194,30 @@ export default class ShopUI {
         source.price
       )
     ) {
+      this.updateBuyButtons();
+
       return;
     }
 
     this.purchasing =
       true;
 
+    let purchased =
+      false;
+
     try {
-      const purchased =
+      purchased =
         this.gameState.spend(
           source.price
         );
 
       if (
-        !purchased
+        purchased
       ) {
-        return;
+        this.inventory.addPowerSource(
+          source
+        );
       }
-
-      this.inventory.addPowerSource(
-        source
-      );
     } finally {
       this.purchasing =
         false;
@@ -1121,11 +1225,17 @@ export default class ShopUI {
 
     this.updateBalance();
 
-    this.render();
+    if (
+      purchased
+    ) {
+      this.render();
+    } else {
+      this.updateBuyButtons();
+    }
   }
 
   // ====================================================
-  // FORMATTERS
+  // FORMAT MONEY
   // ====================================================
 
   private formatMoney(
@@ -1134,14 +1244,23 @@ export default class ShopUI {
     return new Intl.NumberFormat(
       "en-US",
       {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 2,
+        style:
+          "currency",
+
+        currency:
+          "USD",
+
+        maximumFractionDigits:
+          2,
       }
     ).format(
       value
     );
   }
+
+  // ====================================================
+  // FORMAT POWER
+  // ====================================================
 
   private formatPower(
     watts: number
@@ -1151,11 +1270,17 @@ export default class ShopUI {
     ) {
       return `${(
         watts / 1000
-      ).toFixed(1)} kW`;
+      ).toFixed(
+        1
+      )} kW`;
     }
 
     return `${watts} W`;
   }
+
+  // ====================================================
+  // FORMAT HASHRATE
+  // ====================================================
 
   private formatHashrate(
     hashRate: number
@@ -1165,7 +1290,9 @@ export default class ShopUI {
     ) {
       return `${(
         hashRate / 1000
-      ).toFixed(2)} GH/s`;
+      ).toFixed(
+        2
+      )} GH/s`;
     }
 
     return `${hashRate} MH/s`;
