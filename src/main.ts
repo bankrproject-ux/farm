@@ -761,18 +761,10 @@ const rackManagement =
       installedMiner,
       _inventoryItem
     ) => {
-      // ----------------------------------------------
-      // CREATE PHYSICAL MINER
-      // ----------------------------------------------
-
       minerVisuals.addMiner(
         rack,
         installedMiner
       );
-
-      // ----------------------------------------------
-      // RECALCULATE ELECTRICITY
-      // ----------------------------------------------
 
       powerSystem.recalculate();
 
@@ -1068,7 +1060,7 @@ function updateHUDState() {
     rackPlacement.isActive()
   ) {
     help.textContent =
-      "PLACE RACK  •  LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
+      "WASD MOVE  •  PLACE RACK  •  LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
 
     return;
   }
@@ -1077,7 +1069,7 @@ function updateHUDState() {
     powerPlacement.isActive()
   ) {
     help.textContent =
-      "PLACE POWER UNIT  •  LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
+      "WASD MOVE  •  PLACE POWER UNIT  •  LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
 
     return;
   }
@@ -1354,13 +1346,28 @@ function animate() {
       0.05
     );
 
-  // ----------------------------------------------
+  // ==================================================
   // PLAYER
-  // ----------------------------------------------
+  //
+  // IMPORTANT:
+  //
+  // Player movement is allowed during placement.
+  //
+  // It is blocked ONLY while an actual UI menu
+  // is open.
+  //
+  // This means:
+  //
+  // Normal gameplay  -> WASD works
+  // Rack placement   -> WASD works
+  // Power placement  -> WASD works
+  // Shop open        -> WASD disabled
+  // Inventory open   -> WASD disabled
+  // Rack menu open   -> WASD disabled
+  // ==================================================
 
   if (
-    !anyMenuOpen() &&
-    !anyPlacementActive()
+    !anyMenuOpen()
   ) {
     player.update(
       delta
@@ -1377,6 +1384,8 @@ function animate() {
 
   // ----------------------------------------------
   // RACK INTERACTION
+  //
+  // Interaction remains disabled while placing.
   // ----------------------------------------------
 
   if (
@@ -1396,9 +1405,6 @@ function animate() {
 
   // ----------------------------------------------
   // MINER VISUALS
-  //
-  // Synchronizes LEDs with miner.powered
-  // and animates activity LEDs.
   // ----------------------------------------------
 
   minerVisuals.update(
