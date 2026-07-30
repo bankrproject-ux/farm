@@ -6,9 +6,22 @@ import type {
   RackDefinition,
 } from "../mining/RackTypes";
 
+import type {
+  PowerSourceDefinition,
+} from "../mining/PowerTypes";
+
 // ======================================================
 // MINING TYCOON 3D
 // Player Inventory System
+//
+// Inventory supports:
+// - Mining servers
+// - Server racks
+// - Electrical power hardware
+// ======================================================
+
+// ======================================================
+// MINER ITEM
 // ======================================================
 
 export type InventoryMinerItem = {
@@ -21,6 +34,10 @@ export type InventoryMinerItem = {
   purchasedAt: number;
 };
 
+// ======================================================
+// RACK ITEM
+// ======================================================
+
 export type InventoryRackItem = {
   instanceId: string;
 
@@ -31,13 +48,45 @@ export type InventoryRackItem = {
   purchasedAt: number;
 };
 
+// ======================================================
+// POWER SOURCE ITEM
+// ======================================================
+
+export type InventoryPowerSourceItem = {
+  instanceId: string;
+
+  type: "power_source";
+
+  definition: PowerSourceDefinition;
+
+  purchasedAt: number;
+};
+
+// ======================================================
+// INVENTORY ITEM
+// ======================================================
+
 export type InventoryItem =
   | InventoryMinerItem
-  | InventoryRackItem;
+  | InventoryRackItem
+  | InventoryPowerSourceItem;
+
+// ======================================================
+// LISTENER
+// ======================================================
 
 export type InventoryListener = (
   inventory: InventorySystem
 ) => void;
+
+// ======================================================
+// INVENTORY ITEM TYPE
+// ======================================================
+
+type InventoryItemType =
+  | "miner"
+  | "rack"
+  | "power_source";
 
 // ======================================================
 // INVENTORY SYSTEM
@@ -50,21 +99,21 @@ export default class InventorySystem {
   private listeners:
     InventoryListener[] = [];
 
-  private instanceCounter = 0;
+  private instanceCounter =
+    0;
 
   // ====================================================
   // UNIQUE INSTANCE ID
   //
-  // Every purchased item gets its own ID.
+  // Examples:
   //
-  // Example:
-  // miner_bitforge_s1_1
-  // miner_bitforge_s1_2
-  // rack_rack_start_8_3
+  // miner_bitforge_s1_...
+  // rack_rack_start_8_...
+  // power_source_gridbox_2k_...
   // ====================================================
 
   private createInstanceId(
-    type: "miner" | "rack",
+    type: InventoryItemType,
     definitionId: string
   ): string {
     this.instanceCounter++;
@@ -92,7 +141,8 @@ export default class InventorySystem {
             definition.id
           ),
 
-        type: "miner",
+        type:
+          "miner",
 
         definition,
 
@@ -100,7 +150,9 @@ export default class InventorySystem {
           Date.now(),
       };
 
-    this.items.push(item);
+    this.items.push(
+      item
+    );
 
     this.notifyListeners();
 
@@ -122,7 +174,8 @@ export default class InventorySystem {
             definition.id
           ),
 
-        type: "rack",
+        type:
+          "rack",
 
         definition,
 
@@ -130,7 +183,43 @@ export default class InventorySystem {
           Date.now(),
       };
 
-    this.items.push(item);
+    this.items.push(
+      item
+    );
+
+    this.notifyListeners();
+
+    return item;
+  }
+
+  // ====================================================
+  // ADD POWER SOURCE
+  // ====================================================
+
+  public addPowerSource(
+    definition:
+      PowerSourceDefinition
+  ): InventoryPowerSourceItem {
+    const item:
+      InventoryPowerSourceItem = {
+        instanceId:
+          this.createInstanceId(
+            "power_source",
+            definition.id
+          ),
+
+        type:
+          "power_source",
+
+        definition,
+
+        purchasedAt:
+          Date.now(),
+      };
+
+    this.items.push(
+      item
+    );
 
     this.notifyListeners();
 
@@ -142,9 +231,10 @@ export default class InventorySystem {
   //
   // Used when:
   //
-  // Rack is placed into the world.
-  // Miner is installed into a rack.
-  // Item is sold.
+  // Rack is placed into world.
+  // Miner is installed into rack.
+  // Power source is placed.
+  // Hardware is sold.
   // ====================================================
 
   public removeItem(
@@ -157,7 +247,9 @@ export default class InventorySystem {
           instanceId
       );
 
-    if (index === -1) {
+    if (
+      index === -1
+    ) {
       return null;
     }
 
@@ -206,8 +298,10 @@ export default class InventorySystem {
     return this.items.filter(
       (
         item
-      ): item is InventoryMinerItem =>
-        item.type === "miner"
+      ): item is
+        InventoryMinerItem =>
+        item.type ===
+        "miner"
     );
   }
 
@@ -220,17 +314,31 @@ export default class InventorySystem {
     return this.items.filter(
       (
         item
-      ): item is InventoryRackItem =>
-        item.type === "rack"
+      ): item is
+        InventoryRackItem =>
+        item.type ===
+        "rack"
+    );
+  }
+
+  // ====================================================
+  // GET POWER SOURCES
+  // ====================================================
+
+  public getPowerSources():
+    InventoryPowerSourceItem[] {
+    return this.items.filter(
+      (
+        item
+      ): item is
+        InventoryPowerSourceItem =>
+        item.type ===
+        "power_source"
     );
   }
 
   // ====================================================
   // COUNT MINER MODEL
-  //
-  // Example:
-  // How many BitForge S1 are currently
-  // sitting in inventory?
   // ====================================================
 
   public countMiner(
@@ -262,6 +370,23 @@ export default class InventorySystem {
   }
 
   // ====================================================
+  // COUNT POWER SOURCE MODEL
+  // ====================================================
+
+  public countPowerSource(
+    definitionId: string
+  ): number {
+    return this
+      .getPowerSources()
+      .filter(
+        (item) =>
+          item.definition.id ===
+          definitionId
+      )
+      .length;
+  }
+
+  // ====================================================
   // INVENTORY SIZE
   // ====================================================
 
@@ -272,9 +397,6 @@ export default class InventorySystem {
 
   // ====================================================
   // TOTAL INVENTORY VALUE
-  //
-  // Useful later for player statistics
-  // and selling hardware.
   // ====================================================
 
   public getTotalValue():
@@ -295,12 +417,11 @@ export default class InventorySystem {
 
   // ====================================================
   // CLEAR INVENTORY
-  //
-  // Mostly useful for save loading / testing.
   // ====================================================
 
   public clear() {
-    this.items = [];
+    this.items =
+      [];
 
     this.notifyListeners();
   }
@@ -310,7 +431,8 @@ export default class InventorySystem {
   // ====================================================
 
   public subscribe(
-    listener: InventoryListener
+    listener:
+      InventoryListener
   ) {
     this.listeners.push(
       listener
@@ -321,12 +443,18 @@ export default class InventorySystem {
     return () => {
       this.listeners =
         this.listeners.filter(
-          (currentListener) =>
+          (
+            currentListener
+          ) =>
             currentListener !==
             listener
         );
     };
   }
+
+  // ====================================================
+  // NOTIFY
+  // ====================================================
 
   private notifyListeners() {
     for (
