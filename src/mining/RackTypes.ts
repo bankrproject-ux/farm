@@ -15,8 +15,6 @@ export type RackTier =
 
 // ======================================================
 // RACK DEFINITION
-//
-// Static data describing a rack model.
 // ======================================================
 
 export type RackDefinition = {
@@ -28,17 +26,19 @@ export type RackDefinition = {
 
   tier: RackTier;
 
-  // Purchase price.
   price: number;
 
-  // Total physical slots.
   totalSlots: number;
 
-  // Maximum combined miner power.
+  // Electrical rating of the rack.
+  //
+  // Kept as rack specification/display data.
+  // It does NOT prevent hardware installation.
+  //
+  // Actual facility electricity availability
+  // is handled by PowerSystem.
   maxPower: number;
 
-  // Rack dimensions used later
-  // for 3D placement.
   width: number;
 
   height: number;
@@ -50,9 +50,6 @@ export type RackDefinition = {
 
 // ======================================================
 // INSTALLED MINER
-//
-// Represents hardware installed inside
-// a specific rack.
 // ======================================================
 
 export type InstalledMiner = {
@@ -60,18 +57,13 @@ export type InstalledMiner = {
 
   miner: MinerDefinition;
 
-  // Starting rack slot.
   slotIndex: number;
 
-  // Is miner connected to power?
   powered: boolean;
 };
 
 // ======================================================
 // RACK INSTANCE
-//
-// Definition = model of rack.
-// Instance = actual rack owned by player.
 // ======================================================
 
 export type RackInstance = {
@@ -81,7 +73,6 @@ export type RackInstance = {
 
   miners: InstalledMiner[];
 
-  // World position.
   position: {
     x: number;
     y: number;
@@ -96,10 +87,6 @@ export type RackInstance = {
 // ======================================================
 
 export const RACKS: RackDefinition[] = [
-  // ----------------------------------------------------
-  // STARTER RACK
-  // ----------------------------------------------------
-
   {
     id: "rack_start_8",
 
@@ -124,10 +111,6 @@ export const RACKS: RackDefinition[] = [
     description:
       "Small 8-slot rack designed for beginner mining facilities.",
   },
-
-  // ----------------------------------------------------
-  // STANDARD RACK
-  // ----------------------------------------------------
 
   {
     id: "rack_pro_16",
@@ -154,10 +137,6 @@ export const RACKS: RackDefinition[] = [
       "Professional rack with increased capacity and improved power delivery.",
   },
 
-  // ----------------------------------------------------
-  // INDUSTRIAL RACK
-  // ----------------------------------------------------
-
   {
     id: "rack_industrial_24",
 
@@ -182,10 +161,6 @@ export const RACKS: RackDefinition[] = [
     description:
       "Heavy-duty mining rack designed for industrial mining hardware.",
   },
-
-  // ----------------------------------------------------
-  // DATA CENTER RACK
-  // ----------------------------------------------------
 
   {
     id: "rack_datacenter_40",
@@ -259,7 +234,7 @@ export function getFreeSlots(
 }
 
 // ======================================================
-// CURRENT POWER
+// CURRENT ACTIVE POWER
 //
 // Only powered miners consume electricity.
 // ======================================================
@@ -290,11 +265,10 @@ export function getRackPowerUsage(
 // ======================================================
 // INSTALLED POWER REQUIREMENT
 //
-// Unlike getRackPowerUsage(),
-// this counts ALL installed miners.
+// Total theoretical power requirement of all hardware.
 //
-// Used to check whether the rack is capable
-// of powering the complete configuration.
+// This is informational only.
+// It does NOT block installation.
 // ======================================================
 
 export function getInstalledPowerRequirement(
@@ -312,9 +286,7 @@ export function getInstalledPowerRequirement(
 }
 
 // ======================================================
-// TOTAL ACTIVE HASHRATE
-//
-// Miner only generates hashrate when powered.
+// ACTIVE HASHRATE
 // ======================================================
 
 export function getRackHashrate(
@@ -341,9 +313,7 @@ export function getRackHashrate(
 }
 
 // ======================================================
-// TOTAL HEAT
-//
-// Again, only powered hardware generates heat.
+// ACTIVE HEAT
 // ======================================================
 
 export function getRackHeat(
@@ -371,9 +341,6 @@ export function getRackHeat(
 
 // ======================================================
 // CHECK AVAILABLE SLOT RANGE
-//
-// Important because a miner may require
-// 2, 3, or 4 consecutive rack slots.
 // ======================================================
 
 export function areSlotsAvailable(
@@ -423,10 +390,7 @@ export function areSlotsAvailable(
 }
 
 // ======================================================
-// FIND FIRST AVAILABLE SLOT
-//
-// Automatically searches for enough
-// consecutive space for a miner.
+// FIND AVAILABLE SLOT
 // ======================================================
 
 export function findAvailableSlot(
@@ -455,6 +419,17 @@ export function findAvailableSlot(
 
 // ======================================================
 // CAN INSTALL MINER
+//
+// IMPORTANT:
+//
+// Rack installation is determined ONLY by physical
+// rack space.
+//
+// Facility electricity is handled by PowerSystem.
+//
+// This means an 8U rack can contain the full 8U worth
+// of hardware even when the facility does not currently
+// have enough electricity to power all of it.
 // ======================================================
 
 export function canInstallMiner(
@@ -467,26 +442,7 @@ export function canInstallMiner(
       miner
     );
 
-  if (
-    slot === null
-  ) {
-    return false;
-  }
-
-  const requiredPower =
-    getInstalledPowerRequirement(
-      rack
-    ) +
-    miner.powerUsage;
-
-  if (
-    requiredPower >
-    rack.definition.maxPower
-  ) {
-    return false;
-  }
-
-  return true;
+  return slot !== null;
 }
 
 // ======================================================
