@@ -19,12 +19,7 @@ import {
 
 // ======================================================
 // MINING TYCOON 3D
-// Shop UI
-//
-// Categories:
-// - Mining servers
-// - Server racks
-// - Power systems
+// SHOP UI
 // ======================================================
 
 type ShopTab =
@@ -46,7 +41,7 @@ export default class ShopUI {
     HTMLDivElement;
 
   private balanceElement:
-    HTMLSpanElement;
+    HTMLElement;
 
   private activeTab:
     ShopTab = "miners";
@@ -54,9 +49,10 @@ export default class ShopUI {
   private visible =
     false;
 
-  // ====================================================
-  // CONSTRUCTOR
-  // ====================================================
+  // Prevent render while purchase transaction
+  // is currently being processed.
+  private purchasing =
+    false;
 
   constructor(
     gameState: GameState,
@@ -78,7 +74,7 @@ export default class ShopUI {
       );
 
     this.root.className =
-      "shop-overlay";
+      "shop-overlay hidden";
 
     // ==================================================
     // PANEL
@@ -124,7 +120,7 @@ export default class ShopUI {
           <span>BALANCE</span>
 
           <strong>
-            $0
+            $0.00
           </strong>
         </div>
 
@@ -143,7 +139,7 @@ export default class ShopUI {
     );
 
     const balanceElement =
-      header.querySelector<HTMLSpanElement>(
+      header.querySelector<HTMLElement>(
         ".shop-balance strong"
       );
 
@@ -226,10 +222,8 @@ export default class ShopUI {
     footer.className =
       "shop-footer";
 
-    footer.innerHTML = `
-      Purchased hardware is delivered
-      to your facility inventory.
-    `;
+    footer.textContent =
+      "Purchased hardware is delivered to your facility inventory.";
 
     panel.appendChild(
       footer
@@ -240,7 +234,7 @@ export default class ShopUI {
     );
 
     // ==================================================
-    // CLOSE
+    // CLOSE BUTTON
     // ==================================================
 
     const closeButton =
@@ -256,7 +250,7 @@ export default class ShopUI {
     );
 
     // ==================================================
-    // TABS
+    // TAB EVENTS
     // ==================================================
 
     tabs.addEventListener(
@@ -309,32 +303,34 @@ export default class ShopUI {
     );
 
     // ==================================================
-    // ESCAPE
-    // ==================================================
-
-    window.addEventListener(
-      "keydown",
-      (event) => {
-        if (
-          event.code ===
-            "Escape" &&
-          this.visible
-        ) {
-          this.close();
-        }
-      }
-    );
-
-    // ==================================================
-    // GAME STATE
+    // GAME STATE LISTENER
     // ==================================================
 
     this.gameState.subscribe(
       () => {
         this.updateBalance();
 
+        // IMPORTANT:
+        // Don't destroy/recreate shop cards
+        // in the middle of a purchase click.
         if (
-          this.visible
+          this.visible &&
+          !this.purchasing
+        ) {
+          this.render();
+        }
+      }
+    );
+
+    // ==================================================
+    // INVENTORY LISTENER
+    // ==================================================
+
+    this.inventory.subscribe(
+      () => {
+        if (
+          this.visible &&
+          !this.purchasing
         ) {
           this.render();
         }
@@ -344,10 +340,6 @@ export default class ShopUI {
     this.updateBalance();
 
     this.render();
-
-    this.root.classList.add(
-      "hidden"
-    );
   }
 
   // ====================================================
@@ -433,7 +425,6 @@ export default class ShopUI {
       "miners"
     ) {
       this.renderMiners();
-
       return;
     }
 
@@ -442,7 +433,6 @@ export default class ShopUI {
       "racks"
     ) {
       this.renderRacks();
-
       return;
     }
 
@@ -623,7 +613,10 @@ export default class ShopUI {
 
     button?.addEventListener(
       "click",
-      () => {
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
         this.buyMiner(
           miner
         );
@@ -640,20 +633,44 @@ export default class ShopUI {
   private buyMiner(
     miner: MinerDefinition
   ) {
-    const purchased =
-      this.gameState.spend(
-        miner.price
-      );
-
     if (
-      !purchased
+      this.purchasing
     ) {
       return;
     }
 
-    this.inventory.addMiner(
-      miner
-    );
+    if (
+      !this.gameState.canAfford(
+        miner.price
+      )
+    ) {
+      return;
+    }
+
+    this.purchasing =
+      true;
+
+    try {
+      const purchased =
+        this.gameState.spend(
+          miner.price
+        );
+
+      if (
+        !purchased
+      ) {
+        return;
+      }
+
+      this.inventory.addMiner(
+        miner
+      );
+    } finally {
+      this.purchasing =
+        false;
+    }
+
+    this.updateBalance();
 
     this.render();
   }
@@ -819,7 +836,10 @@ export default class ShopUI {
 
     button?.addEventListener(
       "click",
-      () => {
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
         this.buyRack(
           rack
         );
@@ -836,20 +856,44 @@ export default class ShopUI {
   private buyRack(
     rack: RackDefinition
   ) {
-    const purchased =
-      this.gameState.spend(
-        rack.price
-      );
-
     if (
-      !purchased
+      this.purchasing
     ) {
       return;
     }
 
-    this.inventory.addRack(
-      rack
-    );
+    if (
+      !this.gameState.canAfford(
+        rack.price
+      )
+    ) {
+      return;
+    }
+
+    this.purchasing =
+      true;
+
+    try {
+      const purchased =
+        this.gameState.spend(
+          rack.price
+        );
+
+      if (
+        !purchased
+      ) {
+        return;
+      }
+
+      this.inventory.addRack(
+        rack
+      );
+    } finally {
+      this.purchasing =
+        false;
+    }
+
+    this.updateBalance();
 
     this.render();
   }
@@ -884,7 +928,7 @@ export default class ShopUI {
   }
 
   // ====================================================
-  // POWER SOURCE CARD
+  // POWER CARD
   // ====================================================
 
   private createPowerSourceCard(
@@ -943,9 +987,7 @@ export default class ShopUI {
 
       <div class="hardware-stats">
         <div>
-          <span>
-            OUTPUT
-          </span>
+          <span>OUTPUT</span>
 
           <strong>
             ${this.formatPower(
@@ -955,9 +997,7 @@ export default class ShopUI {
         </div>
 
         <div>
-          <span>
-            TIER
-          </span>
+          <span>TIER</span>
 
           <strong>
             ${source.tier.toUpperCase()}
@@ -965,9 +1005,7 @@ export default class ShopUI {
         </div>
 
         <div>
-          <span>
-            HEIGHT
-          </span>
+          <span>HEIGHT</span>
 
           <strong>
             ${source.height.toFixed(
@@ -977,9 +1015,7 @@ export default class ShopUI {
         </div>
 
         <div>
-          <span>
-            WIDTH
-          </span>
+          <span>WIDTH</span>
 
           <strong>
             ${source.width.toFixed(
@@ -991,9 +1027,7 @@ export default class ShopUI {
 
       <div class="shop-card-bottom">
         <div class="shop-price">
-          <span>
-            PRICE
-          </span>
+          <span>PRICE</span>
 
           <strong>
             ${this.formatMoney(
@@ -1027,7 +1061,10 @@ export default class ShopUI {
 
     button?.addEventListener(
       "click",
-      () => {
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
         this.buyPowerSource(
           source
         );
@@ -1045,20 +1082,44 @@ export default class ShopUI {
     source:
       PowerSourceDefinition
   ) {
-    const purchased =
-      this.gameState.spend(
-        source.price
-      );
-
     if (
-      !purchased
+      this.purchasing
     ) {
       return;
     }
 
-    this.inventory.addPowerSource(
-      source
-    );
+    if (
+      !this.gameState.canAfford(
+        source.price
+      )
+    ) {
+      return;
+    }
+
+    this.purchasing =
+      true;
+
+    try {
+      const purchased =
+        this.gameState.spend(
+          source.price
+        );
+
+      if (
+        !purchased
+      ) {
+        return;
+      }
+
+      this.inventory.addPowerSource(
+        source
+      );
+    } finally {
+      this.purchasing =
+        false;
+    }
+
+    this.updateBalance();
 
     this.render();
   }
@@ -1077,7 +1138,9 @@ export default class ShopUI {
         currency: "USD",
         maximumFractionDigits: 2,
       }
-    ).format(value);
+    ).format(
+      value
+    );
   }
 
   private formatPower(
