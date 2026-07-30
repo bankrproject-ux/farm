@@ -6,7 +6,6 @@ import type {
 import {
   getUsedSlots,
   getRackPowerUsage,
-  getInstalledPowerRequirement,
   getRackHashrate,
   findAvailableSlot,
   canInstallMiner,
@@ -165,7 +164,7 @@ export default class RackManagementUI {
     );
 
     // ==================================================
-    // CLOSE BUTTON
+    // CLOSE
     // ==================================================
 
     const closeButton =
@@ -278,11 +277,6 @@ export default class RackManagementUI {
         rack
       );
 
-    const requiredPower =
-      getInstalledPowerRequirement(
-        rack
-      );
-
     const totalHashrate =
       getRackHashrate(
         rack
@@ -293,13 +287,6 @@ export default class RackManagementUI {
         0,
         rack.definition.totalSlots -
           usedSlots
-      );
-
-    const availablePower =
-      Math.max(
-        0,
-        rack.definition.maxPower -
-          requiredPower
       );
 
     this.content.innerHTML =
@@ -356,24 +343,17 @@ export default class RackManagementUI {
 
         <div>
           <span>
-            POWER LOAD
+            ACTIVE POWER
           </span>
 
           <strong>
             ${this.formatPower(
               usedPower
             )}
-            /
-            ${this.formatPower(
-              rack.definition.maxPower
-            )}
           </strong>
 
           <small>
-            ${this.formatPower(
-              availablePower
-            )}
-            AVAILABLE
+            CURRENT LOAD
           </small>
         </div>
 
@@ -617,7 +597,7 @@ export default class RackManagementUI {
   }
 
   // ====================================================
-  // INSTALLED MINER ROW
+  // INSTALLED MINER
   // ====================================================
 
   private createInstalledMiner(
@@ -700,7 +680,10 @@ export default class RackManagementUI {
   }
 
   // ====================================================
-  // AVAILABLE MINER ROW
+  // AVAILABLE MINER
+  //
+  // Only rack-space availability determines whether
+  // hardware can physically be installed.
   // ====================================================
 
   private createAvailableMiner(
@@ -716,38 +699,19 @@ export default class RackManagementUI {
         miner
       );
 
-    const enoughSlots =
-      slotIndex !== null;
-
-    const requiredPower =
-      getInstalledPowerRequirement(
-        rack
-      ) +
-      miner.powerUsage;
-
-    const enoughPower =
-      requiredPower <=
-      rack.definition.maxPower;
-
     const installable =
-      canInstallMiner(
-        rack,
-        miner
-      );
+      slotIndex !== null;
 
     let reason =
       "";
 
-    if (!enoughSlots) {
+    if (!installable) {
       reason =
         `Requires ${miner.rackSlots} consecutive rack slot${
           miner.rackSlots === 1
             ? ""
             : "s"
         }`;
-    } else if (!enoughPower) {
-      reason =
-        "Rack power limit exceeded";
     }
 
     const row =
@@ -868,8 +832,6 @@ export default class RackManagementUI {
     rack: RackInstance,
     item: InventoryMinerItem
   ) {
-    // Make sure the item still exists.
-
     const storedItem =
       this.inventory.getItem(
         item.instanceId
@@ -881,6 +843,7 @@ export default class RackManagementUI {
         "miner"
     ) {
       this.render();
+
       return;
     }
 
@@ -889,7 +852,7 @@ export default class RackManagementUI {
       storedItem.definition;
 
     // ----------------------------------------------
-    // Check rack limits again.
+    // Physical rack-space check only.
     // ----------------------------------------------
 
     if (
@@ -899,11 +862,12 @@ export default class RackManagementUI {
       )
     ) {
       this.render();
+
       return;
     }
 
     // ----------------------------------------------
-    // Find actual consecutive slot range.
+    // Find consecutive rack slots.
     // ----------------------------------------------
 
     const slotIndex =
@@ -916,11 +880,15 @@ export default class RackManagementUI {
       slotIndex === null
     ) {
       this.render();
+
       return;
     }
 
     // ----------------------------------------------
-    // Create the correct InstalledMiner object.
+    // Create installed miner.
+    //
+    // PowerSystem will recalculate powered state
+    // immediately after installation.
     // ----------------------------------------------
 
     const installedMiner:
@@ -932,11 +900,11 @@ export default class RackManagementUI {
 
         slotIndex,
 
-        powered: true,
+        powered: false,
       };
 
     // ----------------------------------------------
-    // Remove from storage.
+    // Remove from inventory.
     // ----------------------------------------------
 
     const removed =
@@ -946,11 +914,12 @@ export default class RackManagementUI {
 
     if (!removed) {
       this.render();
+
       return;
     }
 
     // ----------------------------------------------
-    // Add to physical rack.
+    // Add to rack.
     // ----------------------------------------------
 
     rack.miners.push(
@@ -958,7 +927,11 @@ export default class RackManagementUI {
     );
 
     // ----------------------------------------------
-    // Notify main game.
+    // Notify main.ts.
+    //
+    // main.ts calls PowerSystem.recalculate(),
+    // which decides whether this miner receives
+    // electricity.
     // ----------------------------------------------
 
     this.onMinerInstalled(
