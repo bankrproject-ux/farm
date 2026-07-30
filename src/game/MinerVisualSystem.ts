@@ -8,12 +8,6 @@ import type {
 // ======================================================
 // MINING TYCOON 3D
 // MINER VISUAL SYSTEM
-//
-// Creates physical mining servers inside placed racks.
-// Rack local origin:
-// X = center
-// Y = FLOOR / bottom of rack
-// Z+ = front of rack
 // ======================================================
 
 type RackVisualEntry = {
@@ -24,7 +18,18 @@ type RackVisualEntry = {
 type MinerVisualEntry = {
   instanceId: string;
   rackInstanceId: string;
+
+  installedMiner: InstalledMiner;
+
   object: THREE.Group;
+
+  powerLED: THREE.Mesh;
+  powerLEDMaterial: THREE.MeshStandardMaterial;
+
+  activityLED: THREE.Mesh;
+  activityLEDMaterial: THREE.MeshStandardMaterial;
+
+  blinkOffset: number;
 };
 
 // ======================================================
@@ -42,6 +47,9 @@ export default class MinerVisualSystem {
   private miners:
     Map<string, MinerVisualEntry> =
       new Map();
+
+  private elapsedTime =
+    0;
 
   constructor(
     scene: THREE.Scene
@@ -66,7 +74,6 @@ export default class MinerVisualSystem {
       }
     );
 
-    // Useful later for save/load.
     for (
       const installedMiner
       of rack.miners
@@ -98,6 +105,133 @@ export default class MinerVisualSystem {
       rack,
       installedMiner
     );
+  }
+
+  // ====================================================
+  // UPDATE
+  //
+  // Keeps LEDs synchronized with PowerSystem and
+  // animates activity lights.
+  // ====================================================
+
+  public update(
+    delta: number
+  ) {
+    this.elapsedTime +=
+      delta;
+
+    for (
+      const entry
+      of this.miners.values()
+    ) {
+      const powered =
+        entry.installedMiner.powered;
+
+      // ----------------------------------------------
+      // POWER LED
+      // ----------------------------------------------
+
+      if (powered) {
+        entry.powerLEDMaterial.color.setHex(
+          0x39ff88
+        );
+
+        entry.powerLEDMaterial.emissive.setHex(
+          0x18ff68
+        );
+
+        entry.powerLEDMaterial.emissiveIntensity =
+          7;
+
+        entry.powerLED.visible =
+          true;
+      } else {
+        entry.powerLEDMaterial.color.setHex(
+          0x303840
+        );
+
+        entry.powerLEDMaterial.emissive.setHex(
+          0x000000
+        );
+
+        entry.powerLEDMaterial.emissiveIntensity =
+          0.15;
+
+        entry.powerLED.visible =
+          true;
+      }
+
+      // ----------------------------------------------
+      // ACTIVITY LED
+      //
+      // Different blinkOffset prevents every server
+      // from blinking at exactly the same time.
+      // ----------------------------------------------
+
+      if (!powered) {
+        entry.activityLED.visible =
+          false;
+
+        entry.activityLEDMaterial.emissiveIntensity =
+          0;
+
+        continue;
+      }
+
+      entry.activityLED.visible =
+        true;
+
+      const blinkTime =
+        this.elapsedTime * 7 +
+        entry.blinkOffset;
+
+      const blink =
+        Math.sin(
+          blinkTime
+        );
+
+      const secondaryBlink =
+        Math.sin(
+          blinkTime * 2.37 +
+          entry.blinkOffset
+        );
+
+      const active =
+        blink > -0.15 ||
+        secondaryBlink > 0.72;
+
+      if (active) {
+        entry.activityLEDMaterial.color.setHex(
+          0x52a8ff
+        );
+
+        entry.activityLEDMaterial.emissive.setHex(
+          0x1685ff
+        );
+
+        entry.activityLEDMaterial.emissiveIntensity =
+          9;
+
+        entry.activityLED.scale.setScalar(
+          1.08
+        );
+      } else {
+        entry.activityLEDMaterial.color.setHex(
+          0x12314c
+        );
+
+        entry.activityLEDMaterial.emissive.setHex(
+          0x06192b
+        );
+
+        entry.activityLEDMaterial.emissiveIntensity =
+          0.5;
+
+        entry.activityLED.scale.setScalar(
+          0.92
+        );
+      }
+    }
   }
 
   // ====================================================
@@ -158,10 +292,13 @@ export default class MinerVisualSystem {
 
     // ==================================================
     // SERVER DIMENSIONS
+    //
+    // Make the server fill most of the rack width/depth
+    // so it is clearly visible from first-person view.
     // ==================================================
 
     const serverWidth =
-      rackWidth * 0.72;
+      rackWidth * 0.82;
 
     const occupiedHeight =
       slotHeight *
@@ -169,12 +306,12 @@ export default class MinerVisualSystem {
 
     const serverHeight =
       Math.max(
-        occupiedHeight * 0.78,
-        0.08
+        occupiedHeight * 0.82,
+        0.1
       );
 
     const serverDepth =
-      rackDepth * 0.72;
+      rackDepth * 0.76;
 
     // ==================================================
     // SERVER GROUP
@@ -198,9 +335,9 @@ export default class MinerVisualSystem {
 
     const bodyMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x18212b,
-        roughness: 0.32,
-        metalness: 0.82,
+        color: 0x202b36,
+        roughness: 0.3,
+        metalness: 0.78,
       });
 
     const body =
@@ -224,31 +361,29 @@ export default class MinerVisualSystem {
     );
 
     // ==================================================
-    // FRONT FACE
-    //
-    // RackPlacementSystem uses +Z as rack front.
+    // FRONT PANEL
     // ==================================================
 
     const frontMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x05080c,
+        color: 0x10171e,
         roughness: 0.25,
-        metalness: 0.9,
+        metalness: 0.88,
       });
 
     const front =
       new THREE.Mesh(
         new THREE.BoxGeometry(
           serverWidth * 0.97,
-          serverHeight * 0.82,
-          0.04
+          serverHeight * 0.84,
+          0.055
         ),
         frontMaterial
       );
 
     front.position.z =
       serverDepth / 2 +
-      0.022;
+      0.03;
 
     server.add(
       front
@@ -260,15 +395,15 @@ export default class MinerVisualSystem {
 
     const ventMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x273441,
-        roughness: 0.48,
-        metalness: 0.75,
+        color: 0x465665,
+        roughness: 0.42,
+        metalness: 0.7,
       });
 
     const ventCount =
       Math.max(
-        4,
-        miner.rackSlots * 4
+        5,
+        miner.rackSlots * 5
       );
 
     const ventAreaWidth =
@@ -286,9 +421,9 @@ export default class MinerVisualSystem {
       const vent =
         new THREE.Mesh(
           new THREE.BoxGeometry(
-            ventWidth * 0.48,
+            ventWidth * 0.42,
             serverHeight * 0.42,
-            0.012
+            0.018
           ),
           ventMaterial
         );
@@ -301,7 +436,7 @@ export default class MinerVisualSystem {
         0,
 
         serverDepth / 2 +
-          0.046
+          0.064
       );
 
       server.add(
@@ -310,20 +445,20 @@ export default class MinerVisualSystem {
     }
 
     // ==================================================
-    // LEFT HANDLE
+    // HANDLES
     // ==================================================
 
     const handleMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x45515e,
-        roughness: 0.3,
+        color: 0x667788,
+        roughness: 0.25,
         metalness: 0.9,
       });
 
     const handleHeight =
       Math.max(
-        serverHeight * 0.48,
-        0.035
+        serverHeight * 0.5,
+        0.04
       );
 
     const leftHandle =
@@ -331,7 +466,7 @@ export default class MinerVisualSystem {
         new THREE.BoxGeometry(
           serverWidth * 0.055,
           handleHeight,
-          0.025
+          0.035
         ),
         handleMaterial
       );
@@ -340,16 +475,12 @@ export default class MinerVisualSystem {
       -serverWidth * 0.4,
       0,
       serverDepth / 2 +
-        0.05
+        0.075
     );
 
     server.add(
       leftHandle
     );
-
-    // ==================================================
-    // RIGHT HANDLE
-    // ==================================================
 
     const rightHandle =
       leftHandle.clone();
@@ -362,54 +493,46 @@ export default class MinerVisualSystem {
     );
 
     // ==================================================
-    // POWER LED
+    // LED SIZE
     // ==================================================
-
-    const powerColor =
-      installedMiner.powered
-        ? 0x45ff8a
-        : 0x3b4148;
-
-    const powerLEDMaterial =
-      new THREE.MeshStandardMaterial({
-        color:
-          powerColor,
-
-        emissive:
-          installedMiner.powered
-            ? 0x20ff6d
-            : 0x000000,
-
-        emissiveIntensity:
-          installedMiner.powered
-            ? 5
-            : 0,
-      });
 
     const ledRadius =
       Math.max(
-        0.012,
+        0.018,
         Math.min(
-          0.025,
-          serverHeight * 0.13
+          0.035,
+          serverHeight * 0.16
         )
       );
+
+    // ==================================================
+    // POWER LED - GREEN
+    // ==================================================
+
+    const powerLEDMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0x303840,
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+        roughness: 0.2,
+        metalness: 0.1,
+      });
 
     const powerLED =
       new THREE.Mesh(
         new THREE.SphereGeometry(
           ledRadius,
-          12,
-          12
+          16,
+          16
         ),
         powerLEDMaterial
       );
 
     powerLED.position.set(
-      serverWidth * 0.32,
-      0,
+      serverWidth * 0.31,
+      serverHeight * 0.08,
       serverDepth / 2 +
-        0.07
+        0.095
     );
 
     server.add(
@@ -417,40 +540,82 @@ export default class MinerVisualSystem {
     );
 
     // ==================================================
-    // ACTIVITY LED
+    // ACTIVITY LED - BLUE
     // ==================================================
 
-    if (
-      installedMiner.powered
-    ) {
-      const activityMaterial =
-        new THREE.MeshStandardMaterial({
-          color: 0x45a3ff,
-          emissive: 0x1677ff,
-          emissiveIntensity: 5,
-        });
+    const activityLEDMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0x12314c,
+        emissive: 0x06192b,
+        emissiveIntensity: 0,
+        roughness: 0.2,
+        metalness: 0.1,
+      });
 
-      const activityLED =
-        new THREE.Mesh(
-          new THREE.SphereGeometry(
-            ledRadius * 0.72,
-            10,
-            10
+    const activityLED =
+      new THREE.Mesh(
+        new THREE.SphereGeometry(
+          ledRadius * 0.78,
+          16,
+          16
+        ),
+        activityLEDMaterial
+      );
+
+    activityLED.position.set(
+      serverWidth * 0.23,
+      serverHeight * 0.08,
+      serverDepth / 2 +
+        0.095
+    );
+
+    server.add(
+      activityLED
+    );
+
+    // ==================================================
+    // LED BACKPLATE
+    //
+    // Gives LEDs contrast against the dark server.
+    // ==================================================
+
+    const ledPlate =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          serverWidth * 0.23,
+          Math.max(
+            serverHeight * 0.32,
+            0.06
           ),
-          activityMaterial
-        );
+          0.018
+        ),
 
-      activityLED.position.set(
-        serverWidth * 0.25,
-        0,
-        serverDepth / 2 +
-          0.07
+        new THREE.MeshStandardMaterial({
+          color: 0x05080b,
+          roughness: 0.35,
+          metalness: 0.7,
+        })
       );
 
-      server.add(
-        activityLED
-      );
-    }
+    ledPlate.position.set(
+      serverWidth * 0.27,
+      serverHeight * 0.08,
+      serverDepth / 2 +
+        0.073
+    );
+
+    server.add(
+      ledPlate
+    );
+
+    // Make sure LEDs render in front of plate.
+    powerLED.position.z =
+      serverDepth / 2 +
+      0.105;
+
+    activityLED.position.z =
+      serverDepth / 2 +
+      0.105;
 
     // ==================================================
     // SIDE RAILS
@@ -458,7 +623,7 @@ export default class MinerVisualSystem {
 
     const railMaterial =
       new THREE.MeshStandardMaterial({
-        color: 0x354452,
+        color: 0x526273,
         roughness: 0.3,
         metalness: 0.9,
       });
@@ -466,7 +631,7 @@ export default class MinerVisualSystem {
     const leftRail =
       new THREE.Mesh(
         new THREE.BoxGeometry(
-          0.035,
+          0.04,
           serverHeight * 0.92,
           serverDepth * 0.92
         ),
@@ -475,7 +640,7 @@ export default class MinerVisualSystem {
 
     leftRail.position.x =
       -serverWidth / 2 -
-      0.018;
+      0.02;
 
     server.add(
       leftRail
@@ -486,7 +651,7 @@ export default class MinerVisualSystem {
 
     rightRail.position.x =
       serverWidth / 2 +
-      0.018;
+      0.02;
 
     server.add(
       rightRail
@@ -494,22 +659,6 @@ export default class MinerVisualSystem {
 
     // ==================================================
     // POSITION INSIDE RACK
-    //
-    // IMPORTANT:
-    //
-    // RackPlacementSystem creates rack from:
-    //
-    // y = 0
-    // to
-    // y = rackHeight
-    //
-    // NOT:
-    //
-    // -rackHeight / 2
-    // to
-    // +rackHeight / 2
-    //
-    // slotIndex 0 therefore starts at floor/bottom.
     // ==================================================
 
     const slotBottom =
@@ -520,19 +669,12 @@ export default class MinerVisualSystem {
       slotBottom +
       occupiedHeight / 2;
 
-    // ==================================================
-    // FRONT POSITION
+    // Push the server toward the FRONT of the rack.
     //
-    // Empty slot bars are around:
-    //
-    // +rackDepth / 2
-    //
-    // Put server slightly behind them but still
-    // clearly visible from the front.
-    // ==================================================
-
+    // Previously centerZ = 0.02, which left the server
+    // too deep inside the dark rack.
     const centerZ =
-      0.02;
+      rackDepth * 0.08;
 
     server.position.set(
       0,
@@ -561,45 +703,33 @@ export default class MinerVisualSystem {
         rackInstanceId:
           rack.instanceId,
 
+        installedMiner,
+
         object:
           server,
+
+        powerLED,
+
+        powerLEDMaterial,
+
+        activityLED,
+
+        activityLEDMaterial,
+
+        blinkOffset:
+          Math.random() *
+          Math.PI *
+          2,
       }
     );
 
     console.log(
       "Miner visual created:",
-      {
-        miner:
-          miner.name,
-
-        rack:
-          rack.definition.name,
-
-        slot:
-          installedMiner.slotIndex,
-
-        position: {
-          x:
-            server.position.x,
-
-          y:
-            server.position.y,
-
-          z:
-            server.position.z,
-        },
-
-        size: {
-          width:
-            serverWidth,
-
-          height:
-            serverHeight,
-
-          depth:
-            serverDepth,
-        },
-      }
+      miner.name,
+      "| Rack:",
+      rack.definition.name,
+      "| Slot:",
+      installedMiner.slotIndex
     );
   }
 
@@ -661,7 +791,7 @@ export default class MinerVisualSystem {
   }
 
   // ====================================================
-  // DISPOSE OBJECT
+  // DISPOSE
   // ====================================================
 
   private disposeObject(
