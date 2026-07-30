@@ -672,13 +672,6 @@ powerSystem.subscribe(
 
 // ======================================================
 // SYNC POWER SYSTEM -> GAME STATE
-//
-// GameState currently exposes incremental
-// add/remove methods instead of setHashrate/setPower.
-//
-// Therefore we compare the desired active totals from
-// PowerSystem with the current GameState totals and
-// apply only the difference.
 // ======================================================
 
 function syncMiningPower() {
@@ -701,9 +694,6 @@ function syncMiningPower() {
   const powerDifference =
     targetPower -
     currentPower;
-
-  // Both values normally move together when miners
-  // switch on/off. Handle mixed differences safely.
 
   if (
     hashDifference > 0 ||
@@ -782,11 +772,6 @@ const rackManagement =
 
       // ----------------------------------------------
       // RECALCULATE ELECTRICITY
-      //
-      // DO NOT directly add mining power here.
-      //
-      // PowerSystem decides whether this miner
-      // actually receives electricity.
       // ----------------------------------------------
 
       powerSystem.recalculate();
@@ -859,8 +844,6 @@ const rackInteraction =
 
 // ======================================================
 // POWER SOURCE PLACEMENT
-//
-// Declared before rack placement callback executes.
 // ======================================================
 
 const powerPlacement =
@@ -874,24 +857,9 @@ const powerPlacement =
       powerSource,
       object
     ) => {
-      // ----------------------------------------------
-      // REGISTER WITH ELECTRICAL NETWORK
-      // ----------------------------------------------
-
       powerSystem.registerPowerSource(
         powerSource
       );
-
-      // ----------------------------------------------
-      // POWER OBJECT MUST ALSO BLOCK FUTURE RACKS
-      //
-      // RackPlacementSystem does not currently expose
-      // external collision registration, so for now
-      // power placement itself prevents power-vs-rack
-      // overlap for racks that already exist.
-      //
-      // We'll make two-way collision cleaner later.
-      // ----------------------------------------------
 
       console.log(
         "Power source placed:",
@@ -947,9 +915,6 @@ const rackPlacement =
 
       // ----------------------------------------------
       // ELECTRICAL NETWORK
-      //
-      // A rack itself consumes no power.
-      // Its installed miners do.
       // ----------------------------------------------
 
       powerSystem.registerRack(
@@ -958,9 +923,6 @@ const rackPlacement =
 
       // ----------------------------------------------
       // POWER PLACEMENT COLLISION
-      //
-      // GridBoxes can no longer be placed through
-      // this rack.
       // ----------------------------------------------
 
       powerPlacement
@@ -1235,9 +1197,6 @@ window.addEventListener(
       return;
     }
 
-    // Placement systems handle their own ESC.
-    // We only refresh state after they cancel.
-
     if (
       anyPlacementActive()
     ) {
@@ -1432,6 +1391,17 @@ function animate() {
   // ----------------------------------------------
 
   gameState.update(
+    delta
+  );
+
+  // ----------------------------------------------
+  // MINER VISUALS
+  //
+  // Synchronizes LEDs with miner.powered
+  // and animates activity LEDs.
+  // ----------------------------------------------
+
+  minerVisuals.update(
     delta
   );
 
