@@ -4,26 +4,34 @@ import WalletManager, {
 
 // ======================================================
 // MINING TYCOON 3D
-// WALLET UI
+// LANDING / WALLET GATE
 // ======================================================
 
 export default class WalletUI {
   private wallet:
     WalletManager;
 
-  private container:
+  private overlay:
     HTMLDivElement;
 
-  private button:
+  private connectButton:
     HTMLButtonElement;
 
-  private status:
+  private walletStatus:
     HTMLDivElement;
 
-  private unsubscribe:
-    (() => void) | null = null;
+  private walletAddress:
+    HTMLDivElement;
 
-  private connecting = false;
+  private networkStatus:
+    HTMLSpanElement;
+
+  private connecting =
+    false;
+
+  private unsubscribe:
+    (() => void) | null =
+      null;
 
   // ====================================================
   // CONSTRUCTOR
@@ -32,72 +40,488 @@ export default class WalletUI {
   constructor(
     wallet: WalletManager
   ) {
-    this.wallet = wallet;
+    this.wallet =
+      wallet;
 
     // ==================================================
-    // CONTAINER
+    // ROOT OVERLAY
     // ==================================================
 
-    this.container =
+    this.overlay =
       document.createElement(
         "div"
       );
 
-    this.container.className =
-      "wallet-ui";
+    this.overlay.className =
+      "landing-page";
 
     // ==================================================
-    // STATUS
+    // BACKGROUND
     // ==================================================
 
-    this.status =
+    const background =
       document.createElement(
         "div"
       );
 
-    this.status.className =
-      "wallet-status";
+    background.className =
+      "landing-background";
+
+    const grid =
+      document.createElement(
+        "div"
+      );
+
+    grid.className =
+      "landing-grid";
+
+    const glowOne =
+      document.createElement(
+        "div"
+      );
+
+    glowOne.className =
+      "landing-glow landing-glow-one";
+
+    const glowTwo =
+      document.createElement(
+        "div"
+      );
+
+    glowTwo.className =
+      "landing-glow landing-glow-two";
+
+    background.appendChild(
+      grid
+    );
+
+    background.appendChild(
+      glowOne
+    );
+
+    background.appendChild(
+      glowTwo
+    );
+
+    this.overlay.appendChild(
+      background
+    );
 
     // ==================================================
-    // BUTTON
+    // TOP BAR
     // ==================================================
 
-    this.button =
+    const topBar =
+      document.createElement(
+        "div"
+      );
+
+    topBar.className =
+      "landing-topbar";
+
+    topBar.innerHTML = `
+      <div class="landing-brand">
+        <div class="landing-brand-mark">
+          MT
+        </div>
+
+        <div class="landing-brand-text">
+          <strong>
+            MINING TYCOON
+          </strong>
+
+          <span>
+            INDUSTRIAL MINING SIMULATOR
+          </span>
+        </div>
+      </div>
+
+      <div class="landing-build">
+        <span class="landing-build-dot"></span>
+
+        ALPHA BUILD
+      </div>
+    `;
+
+    this.overlay.appendChild(
+      topBar
+    );
+
+    // ==================================================
+    // MAIN CONTENT
+    // ==================================================
+
+    const content =
+      document.createElement(
+        "main"
+      );
+
+    content.className =
+      "landing-content";
+
+    // ==================================================
+    // EYEBROW
+    // ==================================================
+
+    const eyebrow =
+      document.createElement(
+        "div"
+      );
+
+    eyebrow.className =
+      "landing-eyebrow";
+
+    eyebrow.innerHTML = `
+      <span></span>
+
+      FACILITY NETWORK ONLINE
+
+      <span></span>
+    `;
+
+    content.appendChild(
+      eyebrow
+    );
+
+    // ==================================================
+    // TITLE
+    // ==================================================
+
+    const title =
+      document.createElement(
+        "h1"
+      );
+
+    title.className =
+      "landing-title";
+
+    title.innerHTML = `
+      MINING
+      <span>TYCOON</span>
+    `;
+
+    content.appendChild(
+      title
+    );
+
+    // ==================================================
+    // TAGLINE
+    // ==================================================
+
+    const tagline =
+      document.createElement(
+        "div"
+      );
+
+    tagline.className =
+      "landing-tagline";
+
+    tagline.innerHTML = `
+      <span>BUILD</span>
+      <i></i>
+
+      <span>POWER</span>
+      <i></i>
+
+      <span>MINE</span>
+      <i></i>
+
+      <span>EXPAND</span>
+    `;
+
+    content.appendChild(
+      tagline
+    );
+
+    // ==================================================
+    // DESCRIPTION
+    // ==================================================
+
+    const description =
+      document.createElement(
+        "p"
+      );
+
+    description.className =
+      "landing-description";
+
+    description.textContent =
+      "Build your mining operation from the ground up. Deploy hardware, manage power infrastructure, and grow your facility into an industrial mining empire.";
+
+    content.appendChild(
+      description
+    );
+
+    // ==================================================
+    // LOGIN PANEL
+    // ==================================================
+
+    const loginPanel =
+      document.createElement(
+        "section"
+      );
+
+    loginPanel.className =
+      "landing-login-panel";
+
+    const panelHeader =
+      document.createElement(
+        "div"
+      );
+
+    panelHeader.className =
+      "landing-panel-header";
+
+    panelHeader.innerHTML = `
+      <span>
+        FACILITY ACCESS
+      </span>
+
+      <span class="landing-panel-security">
+        SECURE
+      </span>
+    `;
+
+    loginPanel.appendChild(
+      panelHeader
+    );
+
+    // ==================================================
+    // WALLET STATUS
+    // ==================================================
+
+    this.walletStatus =
+      document.createElement(
+        "div"
+      );
+
+    this.walletStatus.className =
+      "landing-wallet-status";
+
+    this.walletStatus.textContent =
+      "CONNECT YOUR EVM WALLET TO ACCESS YOUR FACILITY";
+
+    loginPanel.appendChild(
+      this.walletStatus
+    );
+
+    // ==================================================
+    // WALLET ADDRESS
+    // ==================================================
+
+    this.walletAddress =
+      document.createElement(
+        "div"
+      );
+
+    this.walletAddress.className =
+      "landing-wallet-address";
+
+    this.walletAddress.style.display =
+      "none";
+
+    loginPanel.appendChild(
+      this.walletAddress
+    );
+
+    // ==================================================
+    // CONNECT BUTTON
+    // ==================================================
+
+    this.connectButton =
       document.createElement(
         "button"
       );
 
-    this.button.type =
+    this.connectButton.type =
       "button";
 
-    this.button.className =
-      "wallet-button";
+    this.connectButton.className =
+      "landing-connect-button";
 
-    this.button.addEventListener(
+    this.connectButton.innerHTML = `
+      <span class="landing-wallet-icon">
+        ◇
+      </span>
+
+      <span>
+        CONNECT WALLET
+      </span>
+
+      <span class="landing-button-arrow">
+        →
+      </span>
+    `;
+
+    this.connectButton.addEventListener(
       "click",
       () => {
-        void this.handleClick();
+        void this.handleConnect();
       }
     );
 
-    // ==================================================
-    // ADD ELEMENTS
-    // ==================================================
-
-    this.container.appendChild(
-      this.status
+    loginPanel.appendChild(
+      this.connectButton
     );
 
-    this.container.appendChild(
-      this.button
+    // ==================================================
+    // NETWORK INFO
+    // ==================================================
+
+    const network =
+      document.createElement(
+        "div"
+      );
+
+    network.className =
+      "landing-network";
+
+    network.innerHTML = `
+      <div>
+        <span class="landing-network-dot"></span>
+
+        EVM COMPATIBLE
+      </div>
+
+      <div>
+        NETWORK
+
+        <span class="landing-network-value">
+          AUTO DETECT
+        </span>
+      </div>
+    `;
+
+    this.networkStatus =
+      network.querySelector(
+        ".landing-network-value"
+      ) as HTMLSpanElement;
+
+    loginPanel.appendChild(
+      network
     );
+
+    content.appendChild(
+      loginPanel
+    );
+
+    // ==================================================
+    // DISCLAIMER
+    // ==================================================
+
+    const disclaimer =
+      document.createElement(
+        "div"
+      );
+
+    disclaimer.className =
+      "landing-disclaimer";
+
+    disclaimer.innerHTML = `
+      <span>◆</span>
+
+      Your wallet remains under your control.
+      Mining Tycoon never requests your private key.
+    `;
+
+    content.appendChild(
+      disclaimer
+    );
+
+    this.overlay.appendChild(
+      content
+    );
+
+    // ==================================================
+    // SIDE DECORATIONS
+    // ==================================================
+
+    const leftDecoration =
+      document.createElement(
+        "div"
+      );
+
+    leftDecoration.className =
+      "landing-side landing-side-left";
+
+    leftDecoration.innerHTML = `
+      <span>01</span>
+      <div></div>
+      <small>FACILITY</small>
+    `;
+
+    const rightDecoration =
+      document.createElement(
+        "div"
+      );
+
+    rightDecoration.className =
+      "landing-side landing-side-right";
+
+    rightDecoration.innerHTML = `
+      <span>ONLINE</span>
+      <div></div>
+      <small>NETWORK</small>
+    `;
+
+    this.overlay.appendChild(
+      leftDecoration
+    );
+
+    this.overlay.appendChild(
+      rightDecoration
+    );
+
+    // ==================================================
+    // FOOTER
+    // ==================================================
+
+    const footer =
+      document.createElement(
+        "footer"
+      );
+
+    footer.className =
+      "landing-footer";
+
+    footer.innerHTML = `
+      <div>
+        MINING TYCOON
+        <span>
+          © 2026
+        </span>
+      </div>
+
+      <div class="landing-footer-center">
+        <span></span>
+
+        SYSTEM READY
+
+        <span></span>
+      </div>
+
+      <div>
+        VERSION
+        <span>
+          0.1 ALPHA
+        </span>
+      </div>
+    `;
+
+    this.overlay.appendChild(
+      footer
+    );
+
+    // ==================================================
+    // MOUNT
+    // ==================================================
 
     document.body.appendChild(
-      this.container
+      this.overlay
     );
 
     // ==================================================
-    // SUBSCRIBE
+    // WALLET STATE
     // ==================================================
 
     this.unsubscribe =
@@ -111,30 +535,24 @@ export default class WalletUI {
   }
 
   // ====================================================
-  // CLICK
+  // CONNECT
   // ====================================================
 
-  private async handleClick() {
+  private async handleConnect() {
     if (
       this.connecting
     ) {
       return;
     }
 
-    // --------------------------------------------------
-    // ALREADY CONNECTED
-    //
-    // For now the button does nothing when connected.
-    //
-    // Later this can open an account panel containing:
-    // - full wallet address
-    // - chain
-    // - logout/session controls
-    // --------------------------------------------------
-
+    // Already connected.
+    // For this first version, clicking again enters
+    // the facility.
     if (
       this.wallet.isConnected()
     ) {
+      this.enterFacility();
+
       return;
     }
 
@@ -142,7 +560,7 @@ export default class WalletUI {
       !this.wallet.isWalletAvailable()
     ) {
       this.showError(
-        "NO EVM WALLET FOUND"
+        "NO EVM WALLET DETECTED"
       );
 
       return;
@@ -151,14 +569,25 @@ export default class WalletUI {
     this.connecting =
       true;
 
-    this.button.disabled =
+    this.connectButton.disabled =
       true;
 
-    this.button.textContent =
-      "CONNECTING...";
+    this.walletStatus.textContent =
+      "WAITING FOR WALLET APPROVAL...";
 
-    this.status.textContent =
-      "WAITING FOR WALLET";
+    this.connectButton.innerHTML = `
+      <span class="landing-wallet-icon landing-wallet-loading">
+        ◇
+      </span>
+
+      <span>
+        CONNECTING...
+      </span>
+
+      <span class="landing-button-arrow">
+        ...
+      </span>
+    `;
 
     try {
       await this.wallet.connect();
@@ -180,7 +609,7 @@ export default class WalletUI {
       this.connecting =
         false;
 
-      this.button.disabled =
+      this.connectButton.disabled =
         false;
 
       this.render(
@@ -203,27 +632,44 @@ export default class WalletUI {
     }
 
     // ==================================================
-    // DISCONNECTED
+    // NOT CONNECTED
     // ==================================================
 
     if (
       !state.connected ||
       !state.address
     ) {
-      this.container.classList.remove(
-        "connected"
+      this.overlay.classList.remove(
+        "wallet-connected"
       );
 
-      this.status.textContent =
+      this.walletAddress.style.display =
+        "none";
+
+      this.walletStatus.textContent =
         this.wallet.isWalletAvailable()
-          ? "WALLET NOT CONNECTED"
-          : "EVM WALLET NOT DETECTED";
+          ? "CONNECT YOUR EVM WALLET TO ACCESS YOUR FACILITY"
+          : "NO EVM WALLET DETECTED";
 
-      this.button.textContent =
-        "CONNECT WALLET";
+      this.networkStatus.textContent =
+        "AUTO DETECT";
 
-      this.button.disabled =
+      this.connectButton.disabled =
         false;
+
+      this.connectButton.innerHTML = `
+        <span class="landing-wallet-icon">
+          ◇
+        </span>
+
+        <span>
+          CONNECT WALLET
+        </span>
+
+        <span class="landing-button-arrow">
+          →
+        </span>
+      `;
 
       return;
     }
@@ -232,32 +678,52 @@ export default class WalletUI {
     // CONNECTED
     // ==================================================
 
-    this.container.classList.add(
-      "connected"
+    this.overlay.classList.add(
+      "wallet-connected"
     );
 
-    this.status.textContent =
-      this.getChainText(
+    this.walletStatus.textContent =
+      "WALLET CONNECTED";
+
+    this.walletAddress.style.display =
+      "flex";
+
+    this.walletAddress.innerHTML = `
+      <span class="landing-address-status"></span>
+
+      <span>
+        ${this.wallet.getShortAddress()}
+      </span>
+    `;
+
+    this.networkStatus.textContent =
+      this.getChainName(
         state.chainId
       );
 
-    this.button.textContent =
-      this.wallet.getShortAddress();
-
-    this.button.disabled =
+    this.connectButton.disabled =
       false;
+
+    this.connectButton.innerHTML = `
+      <span class="landing-wallet-icon">
+        ✓
+      </span>
+
+      <span>
+        ENTER FACILITY
+      </span>
+
+      <span class="landing-button-arrow">
+        →
+      </span>
+    `;
   }
 
   // ====================================================
-  // CHAIN DISPLAY
-  //
-  // Identity is NOT tied to these chains.
-  //
-  // This is only a friendly display of the network
-  // currently selected inside the wallet.
+  // CHAIN NAME
   // ====================================================
 
-  private getChainText(
+  private getChainName(
     chainId: number | null
   ): string {
     if (
@@ -297,28 +763,60 @@ export default class WalletUI {
   private showError(
     message: string
   ) {
-    this.container.classList.remove(
-      "connected"
+    this.walletStatus.textContent =
+      message.toUpperCase();
+
+    this.overlay.classList.add(
+      "wallet-error"
     );
 
-    this.status.textContent =
-      message;
-
-    this.button.textContent =
-      "CONNECT WALLET";
-
-    // Return normal status after a few seconds.
     window.setTimeout(
       () => {
-        if (
-          !this.wallet.isConnected()
-        ) {
-          this.render(
-            this.wallet.getState()
-          );
-        }
+        this.overlay.classList.remove(
+          "wallet-error"
+        );
+
+        this.render(
+          this.wallet.getState()
+        );
       },
       3000
+    );
+  }
+
+  // ====================================================
+  // ENTER FACILITY
+  // ====================================================
+
+  private enterFacility() {
+    if (
+      !this.wallet.isConnected()
+    ) {
+      return;
+    }
+
+    this.overlay.classList.add(
+      "landing-leaving"
+    );
+
+    window.setTimeout(
+      () => {
+        this.overlay.style.display =
+          "none";
+      },
+      550
+    );
+  }
+
+  // ====================================================
+  // IS LANDING OPEN
+  // ====================================================
+
+  public isOpen():
+    boolean {
+    return (
+      this.overlay.style.display !==
+      "none"
     );
   }
 
@@ -336,6 +834,6 @@ export default class WalletUI {
         null;
     }
 
-    this.container.remove();
+    this.overlay.remove();
   }
 }
