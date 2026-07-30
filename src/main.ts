@@ -137,7 +137,8 @@ const player =
 
 const minerVisuals =
   new MinerVisualSystem(
-    scene
+    scene,
+    camera
   );
 
 // ======================================================
