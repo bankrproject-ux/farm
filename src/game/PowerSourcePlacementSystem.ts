@@ -6,7 +6,7 @@ import InventorySystem, {
 
 import type {
   PowerSourceInstance,
-} from "./mining/PowerTypes";
+} from "./PowerTypes";
 
 // ======================================================
 // MINING TYCOON 3D
@@ -83,11 +83,11 @@ export default class PowerSourcePlacementSystem {
   private readonly gridSize =
     0.5;
 
-  // Tiny amount removed from collision boxes.
+  // Small collision tolerance.
   //
-  // This allows objects to physically touch
-  // without Box3 treating the shared edge
-  // as an overlap.
+  // Collision boxes are made slightly smaller
+  // so objects can physically touch without
+  // being considered overlapping.
   private readonly collisionTolerance =
     0.015;
 
@@ -387,8 +387,8 @@ export default class PowerSourcePlacementSystem {
     // ==================================================
     // FLOOR FOOTPRINT
     //
-    // Exact physical dimensions.
-    // No extra +0.15 gap.
+    // Uses actual physical dimensions.
+    // No artificial placement gap.
     // ==================================================
 
     const footprint =
@@ -440,11 +440,9 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
   // UPDATE
   //
-  // Follows camera position every frame.
-  //
-  // Once main.ts keeps PlayerController running
-  // during placement, WASD movement automatically
-  // moves this preview too.
+  // Placement preview follows camera.
+  // When player movement remains active,
+  // WASD moves the preview together with player.
   // ====================================================
 
   public update() {
@@ -637,17 +635,12 @@ export default class PowerSourcePlacementSystem {
     }
 
     // ==================================================
-    // CANDIDATE BOX
+    // CANDIDATE COLLISION BOX
     //
-    // OLD:
-    // width + 0.18
-    // depth + 0.18
+    // Slightly smaller than actual model dimensions.
     //
-    // NEW:
-    // slightly smaller than actual physical size.
-    //
-    // This means touching = valid.
-    // Overlapping = invalid.
+    // TOUCHING = allowed
+    // OVERLAPPING = blocked
     // ==================================================
 
     const collisionWidth =
@@ -677,8 +670,10 @@ export default class PowerSourcePlacementSystem {
     candidateBox.setFromCenterAndSize(
       new THREE.Vector3(
         x,
+
         definition.height /
           2,
+
         z
       ),
 
@@ -690,7 +685,7 @@ export default class PowerSourcePlacementSystem {
     );
 
     // ==================================================
-    // OTHER POWER SOURCE COLLISION
+    // POWER SOURCE COLLISION
     // ==================================================
 
     for (
@@ -703,6 +698,7 @@ export default class PowerSourcePlacementSystem {
             object
           );
 
+      // Shrink existing collision slightly.
       existingBox.expandByScalar(
         -this.collisionTolerance /
           2
@@ -720,10 +716,7 @@ export default class PowerSourcePlacementSystem {
     // ==================================================
     // EXTERNAL COLLISION
     //
-    // Mainly racks.
-    //
-    // Also shrink their Box3 slightly so power
-    // cabinets can sit directly beside racks.
+    // Mainly placed racks.
     // ==================================================
 
     for (
@@ -736,6 +729,7 @@ export default class PowerSourcePlacementSystem {
             object
           );
 
+      // Allow power source to touch rack directly.
       existingBox.expandByScalar(
         -this.collisionTolerance /
           2
@@ -754,7 +748,7 @@ export default class PowerSourcePlacementSystem {
   }
 
   // ====================================================
-  // GHOST MATERIAL
+  // UPDATE GHOST MATERIAL
   // ====================================================
 
   private updateGhostMaterial() {
@@ -1239,7 +1233,7 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
   // REGISTER COLLISION OBJECT
   //
-  // Racks are registered here from main.ts.
+  // Used by main.ts to register racks.
   // ====================================================
 
   public registerCollisionObject(
@@ -1259,7 +1253,7 @@ export default class PowerSourcePlacementSystem {
   }
 
   // ====================================================
-  // REMOVE COLLISION OBJECT
+  // UNREGISTER COLLISION OBJECT
   // ====================================================
 
   public unregisterCollisionObject(
@@ -1287,7 +1281,7 @@ export default class PowerSourcePlacementSystem {
   }
 
   // ====================================================
-  // FINISH
+  // FINISH PLACEMENT
   // ====================================================
 
   private finishPlacement() {
