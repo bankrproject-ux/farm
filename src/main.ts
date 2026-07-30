@@ -13,6 +13,9 @@ import PowerSourcePlacementSystem from "./game/PowerSourcePlacementSystem";
 import ShopUI from "./ui/ShopUI";
 import InventoryUI from "./ui/InventoryUI";
 import RackManagementUI from "./ui/RackManagementUI";
+import WalletUI from "./ui/WalletUI";
+
+import WalletManager from "./wallet/WalletManager";
 
 // ======================================================
 // MINING TYCOON 3D
@@ -42,6 +45,21 @@ const inventory =
 
 const powerSystem =
   new PowerSystem();
+
+// ======================================================
+// WALLET
+// ======================================================
+
+const wallet =
+  new WalletManager();
+
+const walletUI =
+  new WalletUI(
+    wallet
+  );
+
+// Keep reference alive.
+void walletUI;
 
 // ======================================================
 // SCENE
@@ -888,35 +906,19 @@ const rackPlacement =
       rack,
       object
     ) => {
-      // ----------------------------------------------
-      // INTERACTION
-      // ----------------------------------------------
-
       rackInteraction.registerRack(
         rack,
         object
       );
-
-      // ----------------------------------------------
-      // MINER VISUAL SYSTEM
-      // ----------------------------------------------
 
       minerVisuals.registerRack(
         rack,
         object
       );
 
-      // ----------------------------------------------
-      // ELECTRICAL NETWORK
-      // ----------------------------------------------
-
       powerSystem.registerRack(
         rack
       );
-
-      // ----------------------------------------------
-      // POWER PLACEMENT COLLISION
-      // ----------------------------------------------
 
       powerPlacement
         .registerCollisionObject(
@@ -938,10 +940,6 @@ const inventoryUI =
   new InventoryUI(
     inventory,
 
-    // --------------------------------------------------
-    // PLACE RACK
-    // --------------------------------------------------
-
     (rackItem) => {
       powerPlacement.cancel();
 
@@ -955,10 +953,6 @@ const inventoryUI =
 
       updateHUDState();
     },
-
-    // --------------------------------------------------
-    // PLACE POWER SOURCE
-    // --------------------------------------------------
 
     (powerItem) => {
       rackPlacement.cancel();
@@ -1347,26 +1341,6 @@ function animate() {
       0.05
     );
 
-  // ==================================================
-  // PLAYER
-  //
-  // IMPORTANT:
-  //
-  // Player movement is allowed during placement.
-  //
-  // It is blocked ONLY while an actual UI menu
-  // is open.
-  //
-  // This means:
-  //
-  // Normal gameplay  -> WASD works
-  // Rack placement   -> WASD works
-  // Power placement  -> WASD works
-  // Shop open        -> WASD disabled
-  // Inventory open   -> WASD disabled
-  // Rack menu open   -> WASD disabled
-  // ==================================================
-
   if (
     !anyMenuOpen()
   ) {
@@ -1375,19 +1349,9 @@ function animate() {
     );
   }
 
-  // ----------------------------------------------
-  // PLACEMENT SYSTEMS
-  // ----------------------------------------------
-
   rackPlacement.update();
 
   powerPlacement.update();
-
-  // ----------------------------------------------
-  // RACK INTERACTION
-  //
-  // Interaction remains disabled while placing.
-  // ----------------------------------------------
 
   if (
     !anyMenuOpen() &&
@@ -1396,31 +1360,15 @@ function animate() {
     rackInteraction.update();
   }
 
-  // ----------------------------------------------
-  // MINING ECONOMY
-  // ----------------------------------------------
-
   gameState.update(
     delta
   );
-
-  // ----------------------------------------------
-  // MINER VISUALS
-  // ----------------------------------------------
 
   minerVisuals.update(
     delta
   );
 
-  // ----------------------------------------------
-  // UI
-  // ----------------------------------------------
-
   updateUIStateWatcher();
-
-  // ----------------------------------------------
-  // RENDER
-  // ----------------------------------------------
 
   renderer.render(
     scene,
