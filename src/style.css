@@ -2394,178 +2394,1372 @@ canvas {
 }
 
 /* =====================================================
-   WALLET UI
+   MINING TYCOON
+   LANDING PAGE / WALLET GATE
 ===================================================== */
 
-.wallet-ui {
+.landing-page {
   position: fixed;
+  inset: 0;
 
-  top: 92px;
-  right: 30px;
+  z-index: 10000;
 
-  z-index: 90;
+  overflow: hidden;
 
   display: flex;
   align-items: center;
-
-  gap: 10px;
-
-  padding:
-    8px 8px 8px 12px;
-
-  border:
-    1px solid
-    rgba(98, 170, 255, 0.2);
-
-  border-radius: 8px;
+  justify-content: center;
 
   background:
-    rgba(5, 10, 18, 0.82);
+    radial-gradient(
+      circle at 50% 45%,
+      #101b2b 0%,
+      #070c13 42%,
+      #030609 100%
+    );
 
-  backdrop-filter:
-    blur(10px);
+  color: #ffffff;
 
-  box-shadow:
-    0 8px 30px
-    rgba(0, 0, 0, 0.3);
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
 
-  user-select: none;
+  opacity: 1;
+
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
 }
 
-.wallet-status {
-  color: #6f8199;
+/* =====================================================
+   BACKGROUND
+===================================================== */
 
-  font-size: 8px;
-  font-weight: 800;
+.landing-background {
+  position: absolute;
+  inset: 0;
 
-  letter-spacing: 1.5px;
+  overflow: hidden;
 
-  white-space: nowrap;
+  pointer-events: none;
 }
 
-.wallet-button {
-  min-width: 145px;
+.landing-background::before {
+  content: "";
+
+  position: absolute;
+  inset: 0;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,0.015) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      rgba(255,255,255,0.015) 1px,
+      transparent 1px
+    );
+
+  background-size:
+    80px 80px;
+
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      black 20%,
+      black 80%,
+      transparent
+    );
+}
+
+.landing-background::after {
+  content: "";
+
+  position: absolute;
+  inset: 0;
+
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 25%,
+      rgba(0,0,0,0.25) 65%,
+      rgba(0,0,0,0.78) 100%
+    );
+}
+
+/* =====================================================
+   PERSPECTIVE GRID
+===================================================== */
+
+.landing-grid {
+  position: absolute;
+
+  left: -25%;
+  right: -25%;
+  bottom: -38%;
+
+  height: 75%;
+
+  transform:
+    perspective(650px)
+    rotateX(63deg);
+
+  transform-origin:
+    center bottom;
+
+  background-image:
+    linear-gradient(
+      rgba(73, 151, 255, 0.16) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(73, 151, 255, 0.16) 1px,
+      transparent 1px
+    );
+
+  background-size:
+    55px 55px;
+
+  opacity: 0.6;
+
+  animation:
+    landing-grid-move
+    9s
+    linear
+    infinite;
+}
+
+@keyframes landing-grid-move {
+  from {
+    background-position:
+      0 0;
+  }
+
+  to {
+    background-position:
+      0 55px;
+  }
+}
+
+/* =====================================================
+   BACKGROUND GLOWS
+===================================================== */
+
+.landing-glow {
+  position: absolute;
+
+  border-radius: 50%;
+
+  filter:
+    blur(90px);
+
+  opacity: 0.25;
+}
+
+.landing-glow-one {
+  width: 550px;
+  height: 550px;
+
+  left: -220px;
+  top: 20%;
+
+  background:
+    #126fff;
+
+  animation:
+    landing-glow-one
+    8s
+    ease-in-out
+    infinite alternate;
+}
+
+.landing-glow-two {
+  width: 600px;
+  height: 600px;
+
+  right: -260px;
+  bottom: -100px;
+
+  background:
+    #0055ff;
+
+  opacity: 0.18;
+
+  animation:
+    landing-glow-two
+    10s
+    ease-in-out
+    infinite alternate;
+}
+
+@keyframes landing-glow-one {
+  from {
+    transform:
+      translate3d(
+        0,
+        -20px,
+        0
+      );
+  }
+
+  to {
+    transform:
+      translate3d(
+        80px,
+        40px,
+        0
+      );
+  }
+}
+
+@keyframes landing-glow-two {
+  from {
+    transform:
+      translate3d(
+        0,
+        0,
+        0
+      );
+  }
+
+  to {
+    transform:
+      translate3d(
+        -90px,
+        -40px,
+        0
+      );
+  }
+}
+
+/* =====================================================
+   TOP BAR
+===================================================== */
+
+.landing-topbar {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 92px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 
   padding:
-    9px 13px;
+    0 48px;
+
+  box-sizing:
+    border-box;
+
+  border-bottom:
+    1px solid
+    rgba(96, 164, 255, 0.12);
+
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(3, 7, 12, 0.92),
+      rgba(3, 7, 12, 0.35)
+    );
+
+  z-index: 5;
+}
+
+/* =====================================================
+   BRAND
+===================================================== */
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+}
+
+.landing-brand-mark {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   border:
     1px solid
-    rgba(75, 157, 255, 0.55);
+    rgba(76, 159, 255, 0.65);
 
-  border-radius: 6px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(52, 142, 255, 0.24),
+      rgba(13, 52, 96, 0.3)
+    );
+
+  color: #70b4ff;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  letter-spacing: 1px;
+
+  box-shadow:
+    inset 0 0 20px
+    rgba(51, 143, 255, 0.08);
+}
+
+.landing-brand-text {
+  display: flex;
+  flex-direction: column;
+
+  gap: 5px;
+}
+
+.landing-brand-text strong {
+  color: #f5f9ff;
+
+  font-size: 14px;
+  font-weight: 900;
+
+  letter-spacing: 3px;
+}
+
+.landing-brand-text span {
+  color: #62758c;
+
+  font-size: 7px;
+  font-weight: 800;
+
+  letter-spacing: 2px;
+}
+
+/* =====================================================
+   BUILD BADGE
+===================================================== */
+
+.landing-build {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding:
+    8px 12px;
+
+  border:
+    1px solid
+    rgba(80, 155, 255, 0.16);
+
+  background:
+    rgba(8, 16, 27, 0.65);
+
+  color: #71859c;
+
+  font-size: 8px;
+  font-weight: 900;
+
+  letter-spacing: 2px;
+}
+
+.landing-build-dot {
+  width: 6px;
+  height: 6px;
+
+  border-radius: 50%;
+
+  background:
+    #57ff9a;
+
+  box-shadow:
+    0 0 10px
+    rgba(87, 255, 154, 0.8);
+
+  animation:
+    landing-status-pulse
+    1.8s
+    ease-in-out
+    infinite;
+}
+
+@keyframes landing-status-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+
+    box-shadow:
+      0 0 4px
+      rgba(87, 255, 154, 0.35);
+  }
+
+  50% {
+    opacity: 1;
+
+    box-shadow:
+      0 0 14px
+      rgba(87, 255, 154, 0.9);
+  }
+}
+
+/* =====================================================
+   MAIN CONTENT
+===================================================== */
+
+.landing-content {
+  position: relative;
+
+  z-index: 3;
+
+  width: min(
+    720px,
+    calc(100vw - 40px)
+  );
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  text-align: center;
+
+  margin-top: -10px;
+}
+
+/* =====================================================
+   EYEBROW
+===================================================== */
+
+.landing-eyebrow {
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+
+  margin-bottom: 18px;
+
+  color: #5f8fbd;
+
+  font-size: 8px;
+  font-weight: 900;
+
+  letter-spacing: 3px;
+}
+
+.landing-eyebrow span {
+  display: block;
+
+  width: 38px;
+  height: 1px;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      #3979b9
+    );
+}
+
+.landing-eyebrow span:last-child {
+  background:
+    linear-gradient(
+      90deg,
+      #3979b9,
+      transparent
+    );
+}
+
+/* =====================================================
+   MAIN TITLE
+===================================================== */
+
+.landing-title {
+  margin: 0;
+
+  color: #ffffff;
+
+  font-size:
+    clamp(
+      52px,
+      7vw,
+      92px
+    );
+
+  line-height: 0.9;
+
+  font-weight: 950;
+
+  letter-spacing:
+    clamp(
+      4px,
+      0.8vw,
+      12px
+    );
+
+  text-shadow:
+    0 0 45px
+    rgba(91, 164, 255, 0.12);
+}
+
+.landing-title span {
+  display: block;
+
+  margin-top: 12px;
+
+  color: #55a7ff;
 
   background:
     linear-gradient(
       180deg,
-      rgba(55, 137, 255, 0.22),
-      rgba(34, 104, 214, 0.15)
+      #b8dcff,
+      #4a9fff 50%,
+      #2674c8
     );
 
-  color: #76b2ff;
+  -webkit-background-clip:
+    text;
+
+  background-clip:
+    text;
+
+  -webkit-text-fill-color:
+    transparent;
+
+  filter:
+    drop-shadow(
+      0 0 18px
+      rgba(61, 145, 255, 0.18)
+    );
+}
+
+/* =====================================================
+   TAGLINE
+===================================================== */
+
+.landing-tagline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 13px;
+
+  margin-top: 25px;
+
+  color: #8498ad;
 
   font-size: 9px;
-  font-weight: 850;
+  font-weight: 900;
 
-  letter-spacing: 1.3px;
+  letter-spacing: 3px;
+}
+
+.landing-tagline i {
+  width: 3px;
+  height: 3px;
+
+  border-radius: 50%;
+
+  background:
+    #439cff;
+
+  box-shadow:
+    0 0 7px
+    rgba(67, 156, 255, 0.8);
+}
+
+/* =====================================================
+   DESCRIPTION
+===================================================== */
+
+.landing-description {
+  max-width: 570px;
+
+  margin:
+    20px 0 0;
+
+  color: #65798f;
+
+  font-size: 11px;
+
+  line-height: 1.9;
+
+  letter-spacing: 0.4px;
+}
+
+/* =====================================================
+   LOGIN PANEL
+===================================================== */
+
+.landing-login-panel {
+  position: relative;
+
+  width: min(
+    440px,
+    100%
+  );
+
+  margin-top: 32px;
+
+  padding:
+    0 22px 20px;
+
+  box-sizing:
+    border-box;
+
+  border:
+    1px solid
+    rgba(72, 145, 230, 0.24);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(9, 17, 29, 0.94),
+      rgba(4, 9, 16, 0.94)
+    );
+
+  box-shadow:
+    0 25px 80px
+    rgba(0, 0, 0, 0.45),
+    inset 0 1px 0
+    rgba(255, 255, 255, 0.025);
+
+  backdrop-filter:
+    blur(18px);
+}
+
+.landing-login-panel::before {
+  content: "";
+
+  position: absolute;
+
+  top: -1px;
+  left: 20%;
+
+  width: 60%;
+  height: 1px;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      #4a9fff,
+      transparent
+    );
+
+  opacity: 0.8;
+}
+
+/* =====================================================
+   PANEL HEADER
+===================================================== */
+
+.landing-panel-header {
+  height: 43px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-bottom:
+    1px solid
+    rgba(100, 160, 220, 0.1);
+
+  color: #8194a8;
+
+  font-size: 8px;
+  font-weight: 900;
+
+  letter-spacing: 2px;
+}
+
+.landing-panel-security {
+  color: #4ecb88;
+}
+
+/* =====================================================
+   WALLET STATUS
+===================================================== */
+
+.landing-wallet-status {
+  margin-top: 19px;
+
+  color: #71869c;
+
+  font-size: 8px;
+  font-weight: 800;
+
+  line-height: 1.6;
+
+  letter-spacing: 1.4px;
+}
+
+/* =====================================================
+   WALLET ADDRESS
+===================================================== */
+
+.landing-wallet-address {
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  margin-top: 13px;
+
+  padding:
+    9px 12px;
+
+  border:
+    1px solid
+    rgba(80, 218, 139, 0.15);
+
+  background:
+    rgba(40, 130, 80, 0.07);
+
+  color: #78dba1;
+
+  font-family:
+    "Courier New",
+    monospace;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 1px;
+}
+
+.landing-address-status {
+  width: 6px;
+  height: 6px;
+
+  border-radius: 50%;
+
+  background:
+    #5dff9c;
+
+  box-shadow:
+    0 0 9px
+    rgba(93, 255, 156, 0.8);
+}
+
+/* =====================================================
+   CONNECT BUTTON
+===================================================== */
+
+.landing-connect-button {
+  width: 100%;
+  height: 54px;
+
+  margin-top: 17px;
+
+  display: grid;
+
+  grid-template-columns:
+    35px 1fr 35px;
+
+  align-items: center;
+
+  padding:
+    0 13px;
+
+  border:
+    1px solid
+    rgba(74, 158, 255, 0.72);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(40, 121, 218, 0.24),
+      rgba(16, 63, 119, 0.25)
+    );
+
+  color: #8bc4ff;
+
+  font-size: 10px;
+  font-weight: 950;
+
+  letter-spacing: 2.5px;
 
   cursor: pointer;
+
+  outline: none;
+
+  box-shadow:
+    inset 0 0 25px
+    rgba(50, 137, 255, 0.06),
+    0 0 0
+    rgba(46, 134, 255, 0);
 
   transition:
     border-color 0.15s ease,
     background 0.15s ease,
     color 0.15s ease,
+    box-shadow 0.15s ease,
     transform 0.1s ease;
 }
 
-.wallet-button:hover:not(:disabled) {
+.landing-connect-button:hover:not(:disabled) {
   border-color:
-    rgba(104, 177, 255, 0.9);
-
-  background:
-    rgba(65, 148, 255, 0.28);
-
-  color: #ffffff;
-}
-
-.wallet-button:active:not(:disabled) {
-  transform:
-    translateY(1px);
-}
-
-.wallet-button:disabled {
-  cursor: default;
-
-  opacity: 0.65;
-}
-
-/* =====================================================
-   WALLET CONNECTED
-===================================================== */
-
-.wallet-ui.connected {
-  border-color:
-    rgba(108, 255, 157, 0.22);
-
-  background:
-    rgba(5, 18, 13, 0.84);
-}
-
-.wallet-ui.connected
-.wallet-status {
-  color: #6cff9d;
-}
-
-.wallet-ui.connected
-.wallet-button {
-  border-color:
-    rgba(108, 255, 157, 0.42);
+    #6bb4ff;
 
   background:
     linear-gradient(
       180deg,
-      rgba(54, 180, 105, 0.2),
-      rgba(20, 105, 62, 0.15)
+      rgba(50, 142, 255, 0.34),
+      rgba(17, 75, 145, 0.34)
     );
 
-  color: #83ffad;
+  color: #ffffff;
+
+  box-shadow:
+    inset 0 0 30px
+    rgba(67, 155, 255, 0.1),
+    0 0 30px
+    rgba(46, 134, 255, 0.1);
 }
 
-.wallet-ui.connected
-.wallet-button:hover {
-  border-color:
-    rgba(108, 255, 157, 0.7);
+.landing-connect-button:active:not(:disabled) {
+  transform:
+    translateY(1px);
+}
 
-  background:
-    rgba(55, 180, 105, 0.22);
+.landing-connect-button:disabled {
+  cursor: default;
 
-  color: #c4ffd8;
+  opacity: 0.6;
+}
+
+.landing-wallet-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 18px;
+}
+
+.landing-button-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #549ee9;
+
+  font-size: 16px;
+}
+
+.landing-wallet-loading {
+  animation:
+    landing-wallet-spin
+    1s
+    linear
+    infinite;
+}
+
+@keyframes landing-wallet-spin {
+  to {
+    transform:
+      rotate(360deg);
+  }
 }
 
 /* =====================================================
-   WALLET MOBILE
+   NETWORK
 ===================================================== */
 
-@media (max-width: 700px) {
-  .wallet-ui {
-    top: 18px;
-    right: 18px;
+.landing-network {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 
-    padding: 6px;
+  margin-top: 15px;
 
-    gap: 6px;
+  color: #4e6278;
+
+  font-size: 7px;
+  font-weight: 850;
+
+  letter-spacing: 1.4px;
+}
+
+.landing-network > div {
+  display: flex;
+  align-items: center;
+
+  gap: 7px;
+}
+
+.landing-network-dot {
+  width: 5px;
+  height: 5px;
+
+  border-radius: 50%;
+
+  background:
+    #4dff93;
+
+  box-shadow:
+    0 0 7px
+    rgba(77, 255, 147, 0.65);
+}
+
+.landing-network-value {
+  color: #7189a1;
+}
+
+/* =====================================================
+   CONNECTED STATE
+===================================================== */
+
+.wallet-connected
+.landing-login-panel {
+  border-color:
+    rgba(75, 220, 137, 0.25);
+}
+
+.wallet-connected
+.landing-login-panel::before {
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      #52e692,
+      transparent
+    );
+}
+
+.wallet-connected
+.landing-wallet-status {
+  color: #5bce8a;
+}
+
+.wallet-connected
+.landing-connect-button {
+  border-color:
+    rgba(73, 218, 133, 0.65);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(35, 150, 88, 0.23),
+      rgba(15, 81, 48, 0.25)
+    );
+
+  color: #83e9ad;
+}
+
+.wallet-connected
+.landing-connect-button:hover {
+  border-color:
+    #74efaa;
+
+  color: #d7ffe7;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(44, 176, 104, 0.32),
+      rgba(17, 96, 57, 0.32)
+    );
+
+  box-shadow:
+    0 0 30px
+    rgba(72, 225, 137, 0.08);
+}
+
+/* =====================================================
+   ERROR STATE
+===================================================== */
+
+.wallet-error
+.landing-login-panel {
+  border-color:
+    rgba(255, 85, 85, 0.55);
+}
+
+.wallet-error
+.landing-login-panel::before {
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      #ff5555,
+      transparent
+    );
+}
+
+.wallet-error
+.landing-wallet-status {
+  color: #ff7777;
+}
+
+.wallet-error
+.landing-connect-button {
+  border-color:
+    rgba(255, 85, 85, 0.45);
+}
+
+/* =====================================================
+   DISCLAIMER
+===================================================== */
+
+.landing-disclaimer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  max-width: 470px;
+
+  margin-top: 17px;
+
+  color: #42556a;
+
+  font-size: 7px;
+  font-weight: 700;
+
+  line-height: 1.5;
+
+  letter-spacing: 0.8px;
+}
+
+.landing-disclaimer span {
+  color: #397fc7;
+
+  font-size: 7px;
+}
+
+/* =====================================================
+   SIDE DECORATIONS
+===================================================== */
+
+.landing-side {
+  position: absolute;
+
+  top: 50%;
+
+  z-index: 2;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  color: #32485f;
+
+  font-size: 7px;
+  font-weight: 900;
+
+  letter-spacing: 2px;
+
+  pointer-events: none;
+}
+
+.landing-side div {
+  width: 50px;
+  height: 1px;
+
+  background:
+    #223d59;
+}
+
+.landing-side small {
+  font-size: 6px;
+
+  letter-spacing: 2px;
+}
+
+.landing-side-left {
+  left: 28px;
+
+  transform:
+    translateY(-50%)
+    rotate(-90deg);
+}
+
+.landing-side-right {
+  right: 16px;
+
+  transform:
+    translateY(-50%)
+    rotate(90deg);
+}
+
+/* =====================================================
+   FOOTER
+===================================================== */
+
+.landing-footer {
+  position: absolute;
+
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  z-index: 5;
+
+  height: 62px;
+
+  display: grid;
+
+  grid-template-columns:
+    1fr auto 1fr;
+
+  align-items: center;
+
+  padding:
+    0 48px;
+
+  box-sizing:
+    border-box;
+
+  border-top:
+    1px solid
+    rgba(96, 164, 255, 0.1);
+
+  background:
+    linear-gradient(
+      to top,
+      rgba(3, 7, 12, 0.92),
+      rgba(3, 7, 12, 0.2)
+    );
+
+  color: #394e64;
+
+  font-size: 7px;
+  font-weight: 850;
+
+  letter-spacing: 1.5px;
+}
+
+.landing-footer > div:last-child {
+  text-align: right;
+}
+
+.landing-footer span {
+  color: #5d7186;
+
+  margin-left: 6px;
+}
+
+.landing-footer-center {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  color: #47647f;
+}
+
+.landing-footer-center span {
+  width: 22px;
+  height: 1px;
+
+  margin: 0;
+
+  background:
+    #294865;
+}
+
+/* =====================================================
+   LEAVING / ENTER GAME
+===================================================== */
+
+.landing-page.landing-leaving {
+  opacity: 0;
+
+  transform:
+    scale(1.015);
+
+  pointer-events: none;
+}
+
+/* =====================================================
+   SMALL HEIGHT
+===================================================== */
+
+@media (
+  max-height: 820px
+) {
+  .landing-topbar {
+    height: 72px;
   }
 
-  .wallet-status {
+  .landing-content {
+    transform:
+      scale(0.88);
+  }
+
+  .landing-footer {
+    height: 48px;
+  }
+}
+
+/* =====================================================
+   MOBILE
+===================================================== */
+
+@media (
+  max-width: 700px
+) {
+  .landing-topbar {
+    height: 70px;
+
+    padding:
+      0 18px;
+  }
+
+  .landing-brand-mark {
+    width: 35px;
+    height: 35px;
+
+    font-size: 10px;
+  }
+
+  .landing-brand-text strong {
+    font-size: 10px;
+
+    letter-spacing: 2px;
+  }
+
+  .landing-brand-text span {
     display: none;
   }
 
-  .wallet-button {
-    min-width: 125px;
+  .landing-build {
+    padding:
+      7px 8px;
+
+    font-size: 6px;
+
+    letter-spacing: 1px;
+  }
+
+  .landing-content {
+    width:
+      calc(100vw - 32px);
+
+    margin-top: 0;
+  }
+
+  .landing-eyebrow {
+    font-size: 6px;
+
+    letter-spacing: 2px;
+
+    gap: 8px;
+  }
+
+  .landing-eyebrow span {
+    width: 20px;
+  }
+
+  .landing-title {
+    font-size:
+      clamp(
+        42px,
+        15vw,
+        66px
+      );
+
+    letter-spacing: 3px;
+  }
+
+  .landing-title span {
+    margin-top: 8px;
+  }
+
+  .landing-tagline {
+    gap: 8px;
+
+    margin-top: 20px;
+
+    font-size: 7px;
+
+    letter-spacing: 1.5px;
+  }
+
+  .landing-description {
+    max-width: 420px;
+
+    font-size: 9px;
+
+    line-height: 1.7;
+  }
+
+  .landing-login-panel {
+    margin-top: 24px;
 
     padding:
-      8px 10px;
+      0 16px 16px;
+  }
 
-    font-size: 8px;
+  .landing-connect-button {
+    height: 50px;
+
+    font-size: 9px;
+
+    letter-spacing: 1.5px;
+  }
+
+  .landing-network {
+    font-size: 6px;
+  }
+
+  .landing-disclaimer {
+    font-size: 6px;
+  }
+
+  .landing-side {
+    display: none;
+  }
+
+  .landing-footer {
+    height: 48px;
+
+    padding:
+      0 18px;
+
+    grid-template-columns:
+      1fr 1fr;
+
+    font-size: 6px;
+  }
+
+  .landing-footer-center {
+    display: none;
+  }
+}
+
+/* =====================================================
+   VERY SMALL MOBILE
+===================================================== */
+
+@media (
+  max-width: 420px
+) {
+  .landing-description {
+    max-width: 340px;
+  }
+
+  .landing-tagline {
+    gap: 5px;
+
+    font-size: 6px;
+  }
+
+  .landing-login-panel {
+    width: 100%;
+  }
+
+  .landing-network {
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 8px;
   }
 }
