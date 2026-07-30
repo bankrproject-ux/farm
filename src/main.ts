@@ -7,6 +7,8 @@ import InventorySystem from "./game/InventorySystem";
 import RackPlacementSystem from "./game/RackPlacementSystem";
 import RackInteractionSystem from "./game/RackInteractionSystem";
 import MinerVisualSystem from "./game/MinerVisualSystem";
+import PowerSystem from "./game/PowerSystem";
+import PowerSourcePlacementSystem from "./game/PowerSourcePlacementSystem";
 
 import ShopUI from "./ui/ShopUI";
 import InventoryUI from "./ui/InventoryUI";
@@ -37,6 +39,9 @@ const gameState =
 
 const inventory =
   new InventorySystem();
+
+const powerSystem =
+  new PowerSystem();
 
 // ======================================================
 // SCENE
@@ -497,6 +502,16 @@ hud.innerHTML = `
         0 W
       </strong>
     </div>
+
+    <div class="stat">
+      <span class="stat-label">
+        CAPACITY
+      </span>
+
+      <strong data-hud="capacity">
+        0 W
+      </strong>
+    </div>
   </div>
 
   <div class="crosshair"></div>
@@ -527,6 +542,11 @@ const hashrateHUD =
 const powerHUD =
   hud.querySelector<HTMLElement>(
     '[data-hud="power"]'
+  );
+
+const capacityHUD =
+  hud.querySelector<HTMLElement>(
+    '[data-hud="capacity"]'
   );
 
 const help =
@@ -630,6 +650,105 @@ gameState.subscribe(
 );
 
 // ======================================================
+// POWER HUD
+// ======================================================
+
+function updatePowerHUD() {
+  if (
+    capacityHUD
+  ) {
+    capacityHUD.textContent =
+      formatPower(
+        powerSystem.getTotalCapacity()
+      );
+  }
+}
+
+powerSystem.subscribe(
+  () => {
+    updatePowerHUD();
+  }
+);
+
+// ======================================================
+// SYNC POWER SYSTEM -> GAME STATE
+//
+// GameState currently exposes incremental
+// add/remove methods instead of setHashrate/setPower.
+//
+// Therefore we compare the desired active totals from
+// PowerSystem with the current GameState totals and
+// apply only the difference.
+// ======================================================
+
+function syncMiningPower() {
+  const targetHashrate =
+    powerSystem.getActiveHashrate();
+
+  const targetPower =
+    powerSystem.getCurrentPowerUsage();
+
+  const currentHashrate =
+    gameState.getHashrate();
+
+  const currentPower =
+    gameState.getPowerUsage();
+
+  const hashDifference =
+    targetHashrate -
+    currentHashrate;
+
+  const powerDifference =
+    targetPower -
+    currentPower;
+
+  // Both values normally move together when miners
+  // switch on/off. Handle mixed differences safely.
+
+  if (
+    hashDifference > 0 ||
+    powerDifference > 0
+  ) {
+    gameState.addMiningPower(
+      Math.max(
+        0,
+        hashDifference
+      ),
+
+      Math.max(
+        0,
+        powerDifference
+      )
+    );
+  }
+
+  if (
+    hashDifference < 0 ||
+    powerDifference < 0
+  ) {
+    gameState.removeMiningPower(
+      Math.max(
+        0,
+        -hashDifference
+      ),
+
+      Math.max(
+        0,
+        -powerDifference
+      )
+    );
+  }
+}
+
+powerSystem.subscribe(
+  () => {
+    syncMiningPower();
+
+    updatePowerHUD();
+  }
+);
+
+// ======================================================
 // SHOP
 // ======================================================
 
@@ -662,34 +781,38 @@ const rackManagement =
       );
 
       // ----------------------------------------------
-      // ADD MINING POWER
+      // RECALCULATE ELECTRICITY
       //
-      // Only powered miners contribute.
+      // DO NOT directly add mining power here.
+      //
+      // PowerSystem decides whether this miner
+      // actually receives electricity.
       // ----------------------------------------------
 
-      if (
-        installedMiner.powered
-      ) {
-        gameState.addMiningPower(
-          installedMiner
-            .miner.hashRate,
-
-          installedMiner
-            .miner.powerUsage
-        );
-      }
+      powerSystem.recalculate();
 
       console.log(
-        "Miner online:",
+        "Miner installed:",
         installedMiner
           .miner.name,
 
-        installedMiner
-          .miner.hashRate,
+        "| Powered:",
+        installedMiner.powered,
+
+        "| Hashrate:",
+        installedMiner.powered
+          ? installedMiner
+              .miner.hashRate
+          : 0,
+
         "MH/s",
 
-        installedMiner
-          .miner.powerUsage,
+        "| Power:",
+        installedMiner.powered
+          ? installedMiner
+              .miner.powerUsage
+          : 0,
+
         "W"
       );
     }
@@ -715,6 +838,8 @@ const rackInteraction =
 
       if (
         rackPlacement
+          .isActive() ||
+        powerPlacement
           .isActive()
       ) {
         return;
@@ -727,6 +852,61 @@ const rackInteraction =
       rackManagement.open(
         rack
       );
+
+      updateHUDState();
+    }
+  );
+
+// ======================================================
+// POWER SOURCE PLACEMENT
+//
+// Declared before rack placement callback executes.
+// ======================================================
+
+const powerPlacement =
+  new PowerSourcePlacementSystem(
+    scene,
+    camera,
+    renderer.domElement,
+    inventory,
+
+    (
+      powerSource,
+      object
+    ) => {
+      // ----------------------------------------------
+      // REGISTER WITH ELECTRICAL NETWORK
+      // ----------------------------------------------
+
+      powerSystem.registerPowerSource(
+        powerSource
+      );
+
+      // ----------------------------------------------
+      // POWER OBJECT MUST ALSO BLOCK FUTURE RACKS
+      //
+      // RackPlacementSystem does not currently expose
+      // external collision registration, so for now
+      // power placement itself prevents power-vs-rack
+      // overlap for racks that already exist.
+      //
+      // We'll make two-way collision cleaner later.
+      // ----------------------------------------------
+
+      console.log(
+        "Power source placed:",
+        powerSource.definition.name,
+
+        "| Capacity:",
+        powerSource.definition.capacity,
+        "W",
+
+        "| Facility capacity:",
+        powerSystem.getTotalCapacity(),
+        "W"
+      );
+
+      void object;
 
       updateHUDState();
     }
@@ -758,15 +938,35 @@ const rackPlacement =
 
       // ----------------------------------------------
       // MINER VISUAL SYSTEM
-      //
-      // Gives MinerVisualSystem access to
-      // the physical THREE.Group of this rack.
       // ----------------------------------------------
 
       minerVisuals.registerRack(
         rack,
         object
       );
+
+      // ----------------------------------------------
+      // ELECTRICAL NETWORK
+      //
+      // A rack itself consumes no power.
+      // Its installed miners do.
+      // ----------------------------------------------
+
+      powerSystem.registerRack(
+        rack
+      );
+
+      // ----------------------------------------------
+      // POWER PLACEMENT COLLISION
+      //
+      // GridBoxes can no longer be placed through
+      // this rack.
+      // ----------------------------------------------
+
+      powerPlacement
+        .registerCollisionObject(
+          object
+        );
 
       console.log(
         "Rack placed:",
@@ -783,13 +983,37 @@ const inventoryUI =
   new InventoryUI(
     inventory,
 
+    // --------------------------------------------------
+    // PLACE RACK
+    // --------------------------------------------------
+
     (rackItem) => {
+      powerPlacement.cancel();
+
       rackInteraction.setEnabled(
         false
       );
 
       rackPlacement.start(
         rackItem
+      );
+
+      updateHUDState();
+    },
+
+    // --------------------------------------------------
+    // PLACE POWER SOURCE
+    // --------------------------------------------------
+
+    (powerItem) => {
+      rackPlacement.cancel();
+
+      rackInteraction.setEnabled(
+        false
+      );
+
+      powerPlacement.start(
+        powerItem
       );
 
       updateHUDState();
@@ -810,13 +1034,25 @@ function anyMenuOpen():
 }
 
 // ======================================================
+// ANY PLACEMENT ACTIVE
+// ======================================================
+
+function anyPlacementActive():
+  boolean {
+  return (
+    rackPlacement.isActive() ||
+    powerPlacement.isActive()
+  );
+}
+
+// ======================================================
 // INTERACTION STATE
 // ======================================================
 
 function updateInteractionState() {
   const shouldEnable =
     !anyMenuOpen() &&
-    !rackPlacement.isActive();
+    !anyPlacementActive();
 
   rackInteraction.setEnabled(
     shouldEnable
@@ -870,7 +1106,16 @@ function updateHUDState() {
     rackPlacement.isActive()
   ) {
     help.textContent =
-      "LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
+      "PLACE RACK  •  LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
+
+    return;
+  }
+
+  if (
+    powerPlacement.isActive()
+  ) {
+    help.textContent =
+      "PLACE POWER UNIT  •  LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
 
     return;
   }
@@ -904,7 +1149,7 @@ window.addEventListener(
     }
 
     if (
-      rackPlacement.isActive()
+      anyPlacementActive()
     ) {
       return;
     }
@@ -948,7 +1193,7 @@ window.addEventListener(
     }
 
     if (
-      rackPlacement.isActive()
+      anyPlacementActive()
     ) {
       return;
     }
@@ -987,6 +1232,24 @@ window.addEventListener(
       event.code !==
       "Escape"
     ) {
+      return;
+    }
+
+    // Placement systems handle their own ESC.
+    // We only refresh state after they cancel.
+
+    if (
+      anyPlacementActive()
+    ) {
+      setTimeout(
+        () => {
+          updateInteractionState();
+
+          updateHUDState();
+        },
+        0
+      );
+
       return;
     }
 
@@ -1060,7 +1323,11 @@ function updateUIStateWatcher() {
         : "",
 
       rackPlacement.isActive()
-        ? "placement"
+        ? "rack-placement"
+        : "",
+
+      powerPlacement.isActive()
+        ? "power-placement"
         : "",
     ].join("|");
 
@@ -1134,7 +1401,7 @@ function animate() {
 
   if (
     !anyMenuOpen() &&
-    !rackPlacement.isActive()
+    !anyPlacementActive()
   ) {
     player.update(
       delta
@@ -1142,10 +1409,12 @@ function animate() {
   }
 
   // ----------------------------------------------
-  // RACK PLACEMENT
+  // PLACEMENT SYSTEMS
   // ----------------------------------------------
 
   rackPlacement.update();
+
+  powerPlacement.update();
 
   // ----------------------------------------------
   // RACK INTERACTION
@@ -1153,7 +1422,7 @@ function animate() {
 
   if (
     !anyMenuOpen() &&
-    !rackPlacement.isActive()
+    !anyPlacementActive()
   ) {
     rackInteraction.update();
   }
