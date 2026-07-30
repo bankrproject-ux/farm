@@ -7,12 +7,14 @@ import type {
 
 // ======================================================
 // MINING TYCOON 3D
-// MINER VISUAL SYSTEM
+// MINER VISUAL + AUDIO SYSTEM
 // ======================================================
 
 type RackVisualEntry = {
   rack: RackInstance;
   rackObject: THREE.Group;
+
+  audio: THREE.PositionalAudio | null;
 };
 
 type MinerVisualEntry = {
@@ -37,8 +39,7 @@ type MinerVisualEntry = {
 // ======================================================
 
 export default class MinerVisualSystem {
-  private scene:
-    THREE.Scene;
+  private scene: THREE.Scene;
 
   private racks:
     Map<string, RackVisualEntry> =
@@ -48,14 +49,158 @@ export default class MinerVisualSystem {
     Map<string, MinerVisualEntry> =
       new Map();
 
-  private elapsedTime =
-    0;
+  private elapsedTime = 0;
+
+  // ====================================================
+  // AUDIO
+  // ====================================================
+
+  private audioListener:
+    THREE.AudioListener;
+
+  private audioLoader:
+    THREE.AudioLoader;
+
+  private audioBuffer:
+    AudioBuffer | null =
+      null;
+
+  private audioUnlocked =
+    false;
+
+  private readonly audioPath =
+    "/audio/miner-hum.wav";
 
   constructor(
-    scene: THREE.Scene
+    scene: THREE.Scene,
+    camera?: THREE.Camera
   ) {
-    this.scene =
-      scene;
+    this.scene = scene;
+
+    // --------------------------------------------------
+    // AUDIO LISTENER
+    //
+    // Listener follows camera/player.
+    // --------------------------------------------------
+
+    this.audioListener =
+      new THREE.AudioListener();
+
+    if (camera) {
+      camera.add(
+        this.audioListener
+      );
+    } else {
+      this.scene.add(
+        this.audioListener
+      );
+    }
+
+    this.audioLoader =
+      new THREE.AudioLoader();
+
+    this.loadMinerAudio();
+
+    this.bindAudioUnlock();
+  }
+
+  // ====================================================
+  // LOAD AUDIO
+  // ====================================================
+
+  private loadMinerAudio() {
+    this.audioLoader.load(
+      this.audioPath,
+
+      (buffer) => {
+        this.audioBuffer =
+          buffer;
+
+        console.log(
+          "Miner audio loaded:",
+          this.audioPath
+        );
+
+        for (
+          const rackEntry
+          of this.racks.values()
+        ) {
+          this.createRackAudio(
+            rackEntry
+          );
+        }
+      },
+
+      undefined,
+
+      (error) => {
+        console.error(
+          "Failed to load miner audio:",
+          this.audioPath,
+          error
+        );
+      }
+    );
+  }
+
+  // ====================================================
+  // BROWSER AUDIO UNLOCK
+  //
+  // Browsers block autoplay until the player interacts
+  // with the page.
+  // ====================================================
+
+  private bindAudioUnlock() {
+    const unlock =
+      async () => {
+        if (
+          this.audioUnlocked
+        ) {
+          return;
+        }
+
+        try {
+          const context =
+            this.audioListener.context;
+
+          if (
+            context.state ===
+            "suspended"
+          ) {
+            await context.resume();
+          }
+
+          this.audioUnlocked =
+            true;
+
+          this.updateRackAudio();
+
+          console.log(
+            "Miner audio unlocked."
+          );
+        } catch (error) {
+          console.warn(
+            "Could not unlock miner audio:",
+            error
+          );
+        }
+      };
+
+    window.addEventListener(
+      "pointerdown",
+      unlock,
+      {
+        once: true,
+      }
+    );
+
+    window.addEventListener(
+      "keydown",
+      unlock,
+      {
+        once: true,
+      }
+    );
   }
 
   // ====================================================
@@ -66,12 +211,35 @@ export default class MinerVisualSystem {
     rack: RackInstance,
     rackObject: THREE.Group
   ) {
-    this.racks.set(
-      rack.instanceId,
-      {
+    const existing =
+      this.racks.get(
+        rack.instanceId
+      );
+
+    if (existing) {
+      existing.rack =
+        rack;
+
+      existing.rackObject =
+        rackObject;
+
+      return;
+    }
+
+    const rackEntry:
+      RackVisualEntry = {
         rack,
         rackObject,
-      }
+        audio: null,
+      };
+
+    this.racks.set(
+      rack.instanceId,
+      rackEntry
+    );
+
+    this.createRackAudio(
+      rackEntry
     );
 
     for (
@@ -83,6 +251,71 @@ export default class MinerVisualSystem {
         installedMiner
       );
     }
+  }
+
+  // ====================================================
+  // CREATE RACK AUDIO
+  // ====================================================
+
+  private createRackAudio(
+    rackEntry: RackVisualEntry
+  ) {
+    if (
+      rackEntry.audio
+    ) {
+      return;
+    }
+
+    if (
+      !this.audioBuffer
+    ) {
+      return;
+    }
+
+    const audio =
+      new THREE.PositionalAudio(
+        this.audioListener
+      );
+
+    audio.setBuffer(
+      this.audioBuffer
+    );
+
+    audio.setLoop(
+      true
+    );
+
+    // Base volume.
+    audio.setVolume(
+      0.28
+    );
+
+    // Full-ish volume around the rack.
+    audio.setRefDistance(
+      2.2
+    );
+
+    // How quickly sound fades.
+    audio.setRolloffFactor(
+      1.5
+    );
+
+    // Don't hear mining machines from
+    // absurdly far across the world.
+    audio.setMaxDistance(
+      15
+    );
+
+    audio.setDistanceModel(
+      "inverse"
+    );
+
+    rackEntry.rackObject.add(
+      audio
+    );
+
+    rackEntry.audio =
+      audio;
   }
 
   // ====================================================
@@ -105,13 +338,12 @@ export default class MinerVisualSystem {
       rack,
       installedMiner
     );
+
+    this.updateRackAudio();
   }
 
   // ====================================================
   // UPDATE
-  //
-  // Keeps LEDs synchronized with PowerSystem and
-  // animates activity lights.
   // ====================================================
 
   public update(
@@ -163,9 +395,6 @@ export default class MinerVisualSystem {
 
       // ----------------------------------------------
       // ACTIVITY LED
-      //
-      // Different blinkOffset prevents every server
-      // from blinking at exactly the same time.
       // ----------------------------------------------
 
       if (!powered) {
@@ -232,6 +461,99 @@ export default class MinerVisualSystem {
         );
       }
     }
+
+    // Keep audio synchronized with
+    // powered miners.
+    this.updateRackAudio();
+  }
+
+  // ====================================================
+  // UPDATE RACK AUDIO
+  // ====================================================
+
+  private updateRackAudio() {
+    if (
+      !this.audioUnlocked
+    ) {
+      return;
+    }
+
+    for (
+      const rackEntry
+      of this.racks.values()
+    ) {
+      const audio =
+        rackEntry.audio;
+
+      if (
+        !audio ||
+        !this.audioBuffer
+      ) {
+        continue;
+      }
+
+      const poweredMiners =
+        rackEntry.rack.miners.filter(
+          (miner) =>
+            miner.powered
+        );
+
+      const poweredCount =
+        poweredMiners.length;
+
+      // ----------------------------------------------
+      // NO ACTIVE MINERS
+      // ----------------------------------------------
+
+      if (
+        poweredCount === 0
+      ) {
+        if (
+          audio.isPlaying
+        ) {
+          audio.stop();
+        }
+
+        continue;
+      }
+
+      // ----------------------------------------------
+      // VOLUME
+      //
+      // More active miners = slightly louder.
+      // Limited so a full rack isn't deafening.
+      // ----------------------------------------------
+
+      const volume =
+        THREE.MathUtils.clamp(
+          0.18 +
+            poweredCount *
+              0.025,
+          0.18,
+          0.42
+        );
+
+      audio.setVolume(
+        volume
+      );
+
+      // ----------------------------------------------
+      // START SOUND
+      // ----------------------------------------------
+
+      if (
+        !audio.isPlaying
+      ) {
+        try {
+          audio.play();
+        } catch (error) {
+          console.warn(
+            "Could not play rack audio:",
+            error
+          );
+        }
+      }
+    }
   }
 
   // ====================================================
@@ -292,9 +614,6 @@ export default class MinerVisualSystem {
 
     // ==================================================
     // SERVER DIMENSIONS
-    //
-    // Make the server fill most of the rack width/depth
-    // so it is clearly visible from first-person view.
     // ==================================================
 
     const serverWidth =
@@ -506,7 +825,7 @@ export default class MinerVisualSystem {
       );
 
     // ==================================================
-    // POWER LED - GREEN
+    // POWER LED
     // ==================================================
 
     const powerLEDMaterial =
@@ -540,7 +859,7 @@ export default class MinerVisualSystem {
     );
 
     // ==================================================
-    // ACTIVITY LED - BLUE
+    // ACTIVITY LED
     // ==================================================
 
     const activityLEDMaterial =
@@ -575,8 +894,6 @@ export default class MinerVisualSystem {
 
     // ==================================================
     // LED BACKPLATE
-    //
-    // Gives LEDs contrast against the dark server.
     // ==================================================
 
     const ledPlate =
@@ -608,7 +925,6 @@ export default class MinerVisualSystem {
       ledPlate
     );
 
-    // Make sure LEDs render in front of plate.
     powerLED.position.z =
       serverDepth / 2 +
       0.105;
@@ -669,10 +985,6 @@ export default class MinerVisualSystem {
       slotBottom +
       occupiedHeight / 2;
 
-    // Push the server toward the FRONT of the rack.
-    //
-    // Previously centerZ = 0.02, which left the server
-    // too deep inside the dark rack.
     const centerZ =
       rackDepth * 0.08;
 
@@ -723,6 +1035,8 @@ export default class MinerVisualSystem {
       }
     );
 
+    this.updateRackAudio();
+
     console.log(
       "Miner visual created:",
       miner.name,
@@ -758,6 +1072,8 @@ export default class MinerVisualSystem {
     this.miners.delete(
       instanceId
     );
+
+    this.updateRackAudio();
   }
 
   // ====================================================
@@ -791,7 +1107,7 @@ export default class MinerVisualSystem {
   }
 
   // ====================================================
-  // DISPOSE
+  // DISPOSE OBJECT
   // ====================================================
 
   private disposeObject(
@@ -834,6 +1150,26 @@ export default class MinerVisualSystem {
 
   public destroy() {
     for (
+      const rackEntry
+      of this.racks.values()
+    ) {
+      if (
+        rackEntry.audio
+      ) {
+        if (
+          rackEntry.audio.isPlaying
+        ) {
+          rackEntry.audio.stop();
+        }
+
+        rackEntry.audio.removeFromParent();
+
+        rackEntry.audio =
+          null;
+      }
+    }
+
+    for (
       const entry
       of this.miners.values()
     ) {
@@ -847,6 +1183,8 @@ export default class MinerVisualSystem {
     this.miners.clear();
 
     this.racks.clear();
+
+    this.audioListener.removeFromParent();
 
     void this.scene;
   }
