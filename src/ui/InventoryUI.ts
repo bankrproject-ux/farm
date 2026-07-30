@@ -2,17 +2,24 @@ import InventorySystem, {
   type InventoryItem,
   type InventoryMinerItem,
   type InventoryRackItem,
+  type InventoryPowerSourceItem,
 } from "../game/InventorySystem";
 
 // ======================================================
 // MINING TYCOON 3D
 // Inventory UI
+//
+// Supports:
+// - Server racks
+// - Mining servers
+// - Power hardware
 // ======================================================
 
 type InventoryTab =
   | "all"
   | "racks"
-  | "miners";
+  | "miners"
+  | "power";
 
 export default class InventoryUI {
   private inventory:
@@ -30,26 +37,57 @@ export default class InventoryUI {
   private activeTab:
     InventoryTab = "all";
 
-  private visible = false;
+  private visible =
+    false;
 
-  // Called when player selects a rack
-  // to place into the world.
+  // ====================================================
+  // CALLBACKS
+  // ====================================================
+
+  // Rack placement already exists.
   private onPlaceRack:
     (
-      item: InventoryRackItem
+      item:
+        InventoryRackItem
     ) => void;
 
+  // Power placement will be connected
+  // later. Keeping this optional means
+  // current main.ts does NOT need changing yet.
+  private onPlacePowerSource?:
+    (
+      item:
+        InventoryPowerSourceItem
+    ) => void;
+
+  // ====================================================
+  // CONSTRUCTOR
+  // ====================================================
+
   constructor(
-    inventory: InventorySystem,
-    onPlaceRack: (
-      item: InventoryRackItem
-    ) => void
+    inventory:
+      InventorySystem,
+
+    onPlaceRack:
+      (
+        item:
+          InventoryRackItem
+      ) => void,
+
+    onPlacePowerSource?:
+      (
+        item:
+          InventoryPowerSourceItem
+      ) => void
   ) {
     this.inventory =
       inventory;
 
     this.onPlaceRack =
       onPlaceRack;
+
+    this.onPlacePowerSource =
+      onPlacePowerSource;
 
     // ==================================================
     // ROOT
@@ -175,6 +213,14 @@ export default class InventoryUI {
       >
         MINING SERVERS
       </button>
+
+      <button
+        type="button"
+        class="inventory-tab"
+        data-tab="power"
+      >
+        POWER
+      </button>
     `;
 
     panel.appendChild(
@@ -210,8 +256,9 @@ export default class InventoryUI {
       "inventory-footer";
 
     footer.innerHTML = `
-      Racks must be placed inside the facility
-      before mining servers can be installed.
+      Build your facility by placing racks
+      and electrical hardware before
+      installing mining servers.
     `;
 
     panel.appendChild(
@@ -223,7 +270,7 @@ export default class InventoryUI {
     );
 
     // ==================================================
-    // CLOSE BUTTON
+    // CLOSE
     // ==================================================
 
     const closeButton =
@@ -239,7 +286,7 @@ export default class InventoryUI {
     );
 
     // ==================================================
-    // TABS
+    // TAB EVENTS
     // ==================================================
 
     tabs.addEventListener(
@@ -263,7 +310,8 @@ export default class InventoryUI {
         if (
           tab !== "all" &&
           tab !== "racks" &&
-          tab !== "miners"
+          tab !== "miners" &&
+          tab !== "power"
         ) {
           return;
         }
@@ -299,7 +347,9 @@ export default class InventoryUI {
       () => {
         this.updateCount();
 
-        if (this.visible) {
+        if (
+          this.visible
+        ) {
           this.render();
         }
       }
@@ -315,7 +365,8 @@ export default class InventoryUI {
   // ====================================================
 
   public open() {
-    this.visible = true;
+    this.visible =
+      true;
 
     this.root.classList.remove(
       "hidden"
@@ -337,7 +388,8 @@ export default class InventoryUI {
   // ====================================================
 
   public close() {
-    this.visible = false;
+    this.visible =
+      false;
 
     this.root.classList.add(
       "hidden"
@@ -349,7 +401,9 @@ export default class InventoryUI {
   // ====================================================
 
   public toggle() {
-    if (this.visible) {
+    if (
+      this.visible
+    ) {
       this.close();
     } else {
       this.open();
@@ -391,6 +445,7 @@ export default class InventoryUI {
       items.length === 0
     ) {
       this.renderEmpty();
+
       return;
     }
 
@@ -439,19 +494,41 @@ export default class InventoryUI {
       "racks"
     ) {
       return items.filter(
-        (item) =>
-          item.type === "rack"
+        (
+          item
+        ): item is
+          InventoryRackItem =>
+          item.type ===
+          "rack"
+      );
+    }
+
+    if (
+      this.activeTab ===
+      "miners"
+    ) {
+      return items.filter(
+        (
+          item
+        ): item is
+          InventoryMinerItem =>
+          item.type ===
+          "miner"
       );
     }
 
     return items.filter(
-      (item) =>
-        item.type === "miner"
+      (
+        item
+      ): item is
+        InventoryPowerSourceItem =>
+        item.type ===
+        "power_source"
     );
   }
 
   // ====================================================
-  // EMPTY INVENTORY
+  // EMPTY
   // ====================================================
 
   private renderEmpty() {
@@ -480,6 +557,14 @@ export default class InventoryUI {
     ) {
       message =
         "No mining servers in storage.";
+    }
+
+    if (
+      this.activeTab ===
+      "power"
+    ) {
+      message =
+        "No electrical hardware in storage.";
     }
 
     empty.innerHTML = `
@@ -514,14 +599,24 @@ export default class InventoryUI {
     item: InventoryItem
   ): HTMLDivElement {
     if (
-      item.type === "rack"
+      item.type ===
+      "rack"
     ) {
       return this.createRackCard(
         item
       );
     }
 
-    return this.createMinerCard(
+    if (
+      item.type ===
+      "miner"
+    ) {
+      return this.createMinerCard(
+        item
+      );
+    }
+
+    return this.createPowerCard(
       item
     );
   }
@@ -531,7 +626,8 @@ export default class InventoryUI {
   // ====================================================
 
   private createRackCard(
-    item: InventoryRackItem
+    item:
+      InventoryRackItem
   ): HTMLDivElement {
     const rack =
       item.definition;
@@ -570,7 +666,9 @@ export default class InventoryUI {
 
       <div class="inventory-item-stats">
         <div>
-          <span>CAPACITY</span>
+          <span>
+            CAPACITY
+          </span>
 
           <strong>
             ${rack.totalSlots}U
@@ -578,7 +676,9 @@ export default class InventoryUI {
         </div>
 
         <div>
-          <span>MAX POWER</span>
+          <span>
+            MAX POWER
+          </span>
 
           <strong>
             ${this.formatPower(
@@ -620,7 +720,8 @@ export default class InventoryUI {
   // ====================================================
 
   private createMinerCard(
-    item: InventoryMinerItem
+    item:
+      InventoryMinerItem
   ): HTMLDivElement {
     const miner =
       item.definition;
@@ -662,7 +763,9 @@ export default class InventoryUI {
 
       <div class="inventory-item-stats">
         <div>
-          <span>HASHRATE</span>
+          <span>
+            HASHRATE
+          </span>
 
           <strong>
             ${this.formatHashrate(
@@ -672,7 +775,9 @@ export default class InventoryUI {
         </div>
 
         <div>
-          <span>POWER</span>
+          <span>
+            POWER
+          </span>
 
           <strong>
             ${this.formatPower(
@@ -682,7 +787,9 @@ export default class InventoryUI {
         </div>
 
         <div>
-          <span>RACK SPACE</span>
+          <span>
+            RACK SPACE
+          </span>
 
           <strong>
             ${miner.rackSlots}U
@@ -690,7 +797,9 @@ export default class InventoryUI {
         </div>
 
         <div>
-          <span>HEAT</span>
+          <span>
+            HEAT
+          </span>
 
           <strong>
             ${miner.heatOutput}
@@ -711,6 +820,169 @@ export default class InventoryUI {
         to install this server.
       </div>
     `;
+
+    return card;
+  }
+
+  // ====================================================
+  // POWER SOURCE CARD
+  // ====================================================
+
+  private createPowerCard(
+    item:
+      InventoryPowerSourceItem
+  ): HTMLDivElement {
+    const power =
+      item.definition;
+
+    const card =
+      document.createElement(
+        "div"
+      );
+
+    card.className =
+      "inventory-card";
+
+    card.innerHTML = `
+      <div class="inventory-item-visual power-visual">
+        <div
+          style="
+            width: 72px;
+            height: 92px;
+            border: 2px solid #33485f;
+            background: #0b1118;
+            position: relative;
+            box-shadow:
+              inset 0 0 20px rgba(50, 140, 255, 0.08);
+          "
+        >
+          <div
+            style="
+              position: absolute;
+              left: 12px;
+              right: 12px;
+              top: 16px;
+              height: 4px;
+              background: #26384a;
+            "
+          ></div>
+
+          <div
+            style="
+              position: absolute;
+              left: 12px;
+              right: 12px;
+              top: 29px;
+              height: 4px;
+              background: #26384a;
+            "
+          ></div>
+
+          <div
+            style="
+              position: absolute;
+              left: 12px;
+              right: 12px;
+              top: 42px;
+              height: 4px;
+              background: #26384a;
+            "
+          ></div>
+
+          <div
+            style="
+              position: absolute;
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: #52ff91;
+              right: 10px;
+              bottom: 10px;
+              box-shadow:
+                0 0 8px #52ff91;
+            "
+          ></div>
+        </div>
+      </div>
+
+      <div class="inventory-item-type">
+        POWER DISTRIBUTION
+      </div>
+
+      <h3>
+        ${power.name}
+      </h3>
+
+      <span class="inventory-manufacturer">
+        ${power.manufacturer}
+      </span>
+
+      <div class="inventory-item-stats">
+        <div>
+          <span>
+            CAPACITY
+          </span>
+
+          <strong>
+            ${this.formatPower(
+              power.capacity
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            TIER
+          </span>
+
+          <strong>
+            ${power.tier.toUpperCase()}
+          </strong>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="inventory-action power-place-action"
+        ${
+          this.onPlacePowerSource
+            ? ""
+            : "disabled"
+        }
+      >
+        ${
+          this.onPlacePowerSource
+            ? "PLACE POWER UNIT"
+            : "PLACEMENT NOT READY"
+        }
+      </button>
+
+      <div class="inventory-hint">
+        Supplies electricity to
+        mining hardware in the facility.
+      </div>
+    `;
+
+    const button =
+      card.querySelector<HTMLButtonElement>(
+        ".power-place-action"
+      );
+
+    if (
+      button &&
+      this.onPlacePowerSource
+    ) {
+      button.addEventListener(
+        "click",
+        () => {
+          this.close();
+
+          this.onPlacePowerSource?.(
+            item
+          );
+        }
+      );
+    }
 
     return card;
   }
