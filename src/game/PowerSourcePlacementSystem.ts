@@ -6,7 +6,7 @@ import InventorySystem, {
 
 import type {
   PowerSourceInstance,
-} from "../mining/PowerTypes";
+} from "./mining/PowerTypes";
 
 // ======================================================
 // MINING TYCOON 3D
@@ -21,6 +21,11 @@ import type {
 // - Player collision
 // - Rack collision
 // - Power unit collision
+//
+// FIX:
+// - No artificial collision gap
+// - Power units can touch racks
+// - Power units can touch other power units
 // ======================================================
 
 export type PowerSourcePlacedCallback = (
@@ -78,6 +83,14 @@ export default class PowerSourcePlacementSystem {
   private readonly gridSize =
     0.5;
 
+  // Tiny amount removed from collision boxes.
+  //
+  // This allows objects to physically touch
+  // without Box3 treating the shared edge
+  // as an overlap.
+  private readonly collisionTolerance =
+    0.015;
+
   // ====================================================
   // PLACED POWER SOURCES
   // ====================================================
@@ -91,8 +104,7 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
   // EXTERNAL COLLISION OBJECTS
   //
-  // Rack objects will be registered here from main.ts
-  // so power units cannot be placed through racks.
+  // Rack objects registered from main.ts.
   // ====================================================
 
   private collisionObjects:
@@ -111,9 +123,11 @@ export default class PowerSourcePlacementSystem {
 
   private validMaterial =
     new THREE.MeshStandardMaterial({
-      color: 0x42ff91,
+      color:
+        0x42ff91,
 
-      emissive: 0x0b5529,
+      emissive:
+        0x0b5529,
 
       emissiveIntensity:
         0.8,
@@ -133,9 +147,11 @@ export default class PowerSourcePlacementSystem {
 
   private invalidMaterial =
     new THREE.MeshStandardMaterial({
-      color: 0xff4f5e,
+      color:
+        0xff4f5e,
 
-      emissive: 0x66121a,
+      emissive:
+        0x66121a,
 
       emissiveIntensity:
         0.8,
@@ -370,16 +386,16 @@ export default class PowerSourcePlacementSystem {
 
     // ==================================================
     // FLOOR FOOTPRINT
+    //
+    // Exact physical dimensions.
+    // No extra +0.15 gap.
     // ==================================================
 
     const footprint =
       new THREE.Mesh(
         new THREE.PlaneGeometry(
-          definition.width +
-            0.15,
-
-          definition.depth +
-            0.15
+          definition.width,
+          definition.depth
         ),
 
         new THREE.MeshBasicMaterial({
@@ -423,6 +439,12 @@ export default class PowerSourcePlacementSystem {
 
   // ====================================================
   // UPDATE
+  //
+  // Follows camera position every frame.
+  //
+  // Once main.ts keeps PlayerController running
+  // during placement, WASD movement automatically
+  // moves this preview too.
   // ====================================================
 
   public update() {
@@ -440,8 +462,6 @@ export default class PowerSourcePlacementSystem {
     this.camera.getWorldDirection(
       forward
     );
-
-    // Keep placement on floor.
 
     forward.y =
       0;
@@ -618,7 +638,38 @@ export default class PowerSourcePlacementSystem {
 
     // ==================================================
     // CANDIDATE BOX
+    //
+    // OLD:
+    // width + 0.18
+    // depth + 0.18
+    //
+    // NEW:
+    // slightly smaller than actual physical size.
+    //
+    // This means touching = valid.
+    // Overlapping = invalid.
     // ==================================================
+
+    const collisionWidth =
+      Math.max(
+        0.01,
+        width -
+          this.collisionTolerance
+      );
+
+    const collisionDepth =
+      Math.max(
+        0.01,
+        depth -
+          this.collisionTolerance
+      );
+
+    const collisionHeight =
+      Math.max(
+        0.01,
+        definition.height -
+          this.collisionTolerance
+      );
 
     const candidateBox =
       new THREE.Box3();
@@ -632,13 +683,9 @@ export default class PowerSourcePlacementSystem {
       ),
 
       new THREE.Vector3(
-        width +
-          0.18,
-
-        definition.height,
-
-        depth +
-          0.18
+        collisionWidth,
+        collisionHeight,
+        collisionDepth
       )
     );
 
@@ -656,6 +703,11 @@ export default class PowerSourcePlacementSystem {
             object
           );
 
+      existingBox.expandByScalar(
+        -this.collisionTolerance /
+          2
+      );
+
       if (
         candidateBox.intersectsBox(
           existingBox
@@ -669,6 +721,9 @@ export default class PowerSourcePlacementSystem {
     // EXTERNAL COLLISION
     //
     // Mainly racks.
+    //
+    // Also shrink their Box3 slightly so power
+    // cabinets can sit directly beside racks.
     // ==================================================
 
     for (
@@ -680,6 +735,11 @@ export default class PowerSourcePlacementSystem {
           .setFromObject(
             object
           );
+
+      existingBox.expandByScalar(
+        -this.collisionTolerance /
+          2
+      );
 
       if (
         candidateBox.intersectsBox(
@@ -910,19 +970,19 @@ export default class PowerSourcePlacementSystem {
     const bodyMaterial =
       new THREE.MeshStandardMaterial({
         color:
-          0x141c24,
+          0x0c1117,
 
         roughness:
-          0.4,
+          0.38,
 
         metalness:
-          0.78,
+          0.82,
       });
 
     const frameMaterial =
       new THREE.MeshStandardMaterial({
         color:
-          0x080c10,
+          0x05080c,
 
         roughness:
           0.3,
@@ -934,17 +994,17 @@ export default class PowerSourcePlacementSystem {
     const panelMaterial =
       new THREE.MeshStandardMaterial({
         color:
-          0x202c37,
+          0x121a22,
 
         roughness:
-          0.38,
+          0.48,
 
         metalness:
           0.72,
       });
 
     // ==================================================
-    // BODY
+    // MAIN BODY
     // ==================================================
 
     const body =
@@ -976,14 +1036,14 @@ export default class PowerSourcePlacementSystem {
     // FRONT PANEL
     // ==================================================
 
-    const frontPanel =
+    const front =
       new THREE.Mesh(
         new THREE.BoxGeometry(
           definition.width *
-            0.82,
+            0.78,
 
           definition.height *
-            0.78,
+            0.72,
 
           0.035
         ),
@@ -991,7 +1051,7 @@ export default class PowerSourcePlacementSystem {
         panelMaterial
       );
 
-    frontPanel.position.set(
+    front.position.set(
       0,
 
       definition.height *
@@ -1002,15 +1062,15 @@ export default class PowerSourcePlacementSystem {
         0.02
     );
 
-    frontPanel.castShadow =
+    front.castShadow =
       true;
 
     group.add(
-      frontPanel
+      front
     );
 
     // ==================================================
-    // PANEL DIVIDERS
+    // FRONT DIVIDERS
     // ==================================================
 
     const dividerGeometry =
@@ -1179,11 +1239,7 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
   // REGISTER COLLISION OBJECT
   //
-  // Used later from main.ts:
-  //
-  // powerPlacement.registerCollisionObject(
-  //   rackObject
-  // );
+  // Racks are registered here from main.ts.
   // ====================================================
 
   public registerCollisionObject(
