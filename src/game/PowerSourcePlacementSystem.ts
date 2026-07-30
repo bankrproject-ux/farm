@@ -6,26 +6,26 @@ import InventorySystem, {
 
 import type {
   PowerSourceInstance,
-} from "./PowerTypes";
+} from "./mining/PowerTypes";
 
 // ======================================================
 // MINING TYCOON 3D
 // POWER SOURCE PLACEMENT SYSTEM
 //
 // Handles:
-// - Power unit placement
+// - Power source placement
 // - Ghost preview
 // - Grid snapping
 // - Rotation
 // - Facility boundaries
 // - Player collision
 // - Rack collision
-// - Power unit collision
+// - Power source collision
 //
 // FIX:
+// - Power sources can be placed close together
+// - Power sources can touch racks
 // - No artificial collision gap
-// - Power units can touch racks
-// - Power units can touch other power units
 // ======================================================
 
 export type PowerSourcePlacedCallback = (
@@ -38,56 +38,40 @@ export type PowerSourcePlacedCallback = (
 // ======================================================
 
 export default class PowerSourcePlacementSystem {
-  private scene:
-    THREE.Scene;
+  private scene: THREE.Scene;
 
-  private camera:
-    THREE.PerspectiveCamera;
+  private camera: THREE.PerspectiveCamera;
 
-  private domElement:
-    HTMLElement;
+  private domElement: HTMLElement;
 
-  private inventory:
-    InventorySystem;
+  private inventory: InventorySystem;
 
   private activeItem:
-    InventoryPowerSourceItem | null =
-      null;
+    InventoryPowerSourceItem | null = null;
 
   private ghost:
-    THREE.Group | null =
-      null;
+    THREE.Group | null = null;
 
-  private active =
-    false;
+  private active = false;
 
-  private validPlacement =
-    false;
+  private validPlacement = false;
 
-  private rotationY =
-    0;
+  private rotationY = 0;
 
   // ====================================================
   // PLACEMENT SETTINGS
   // ====================================================
 
-  private readonly placementDistance =
-    4;
+  private readonly placementDistance = 4;
 
-  private readonly roomLimitX =
-    8.7;
+  private readonly roomLimitX = 8.7;
 
-  private readonly roomLimitZ =
-    8.7;
+  private readonly roomLimitZ = 8.7;
 
-  private readonly gridSize =
-    0.5;
+  private readonly gridSize = 0.5;
 
-  // Small collision tolerance.
-  //
-  // Collision boxes are made slightly smaller
-  // so objects can physically touch without
-  // being considered overlapping.
+  // Small tolerance so touching objects
+  // are not considered overlapping.
   private readonly collisionTolerance =
     0.015;
 
@@ -104,7 +88,7 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
   // EXTERNAL COLLISION OBJECTS
   //
-  // Rack objects registered from main.ts.
+  // Racks registered from main.ts.
   // ====================================================
 
   private collisionObjects:
@@ -123,50 +107,36 @@ export default class PowerSourcePlacementSystem {
 
   private validMaterial =
     new THREE.MeshStandardMaterial({
-      color:
-        0x42ff91,
+      color: 0x42ff91,
 
-      emissive:
-        0x0b5529,
+      emissive: 0x0b5529,
 
-      emissiveIntensity:
-        0.8,
+      emissiveIntensity: 0.8,
 
-      transparent:
-        true,
+      transparent: true,
 
-      opacity:
-        0.55,
+      opacity: 0.55,
 
-      roughness:
-        0.4,
+      roughness: 0.4,
 
-      metalness:
-        0.3,
+      metalness: 0.3,
     });
 
   private invalidMaterial =
     new THREE.MeshStandardMaterial({
-      color:
-        0xff4f5e,
+      color: 0xff4f5e,
 
-      emissive:
-        0x66121a,
+      emissive: 0x66121a,
 
-      emissiveIntensity:
-        0.8,
+      emissiveIntensity: 0.8,
 
-      transparent:
-        true,
+      transparent: true,
 
-      opacity:
-        0.55,
+      opacity: 0.55,
 
-      roughness:
-        0.4,
+      roughness: 0.4,
 
-      metalness:
-        0.3,
+      metalness: 0.3,
     });
 
   // ====================================================
@@ -181,17 +151,13 @@ export default class PowerSourcePlacementSystem {
     onPowerSourcePlaced:
       PowerSourcePlacedCallback
   ) {
-    this.scene =
-      scene;
+    this.scene = scene;
 
-    this.camera =
-      camera;
+    this.camera = camera;
 
-    this.domElement =
-      domElement;
+    this.domElement = domElement;
 
-    this.inventory =
-      inventory;
+    this.inventory = inventory;
 
     this.onPowerSourcePlaced =
       onPowerSourcePlaced;
@@ -207,9 +173,7 @@ export default class PowerSourcePlacementSystem {
     window.addEventListener(
       "keydown",
       (event) => {
-        if (
-          !this.active
-        ) {
+        if (!this.active) {
           return;
         }
 
@@ -218,8 +182,7 @@ export default class PowerSourcePlacementSystem {
         // --------------------------------------------
 
         if (
-          event.code ===
-            "KeyR" &&
+          event.code === "KeyR" &&
           !event.repeat
         ) {
           this.rotate();
@@ -230,8 +193,7 @@ export default class PowerSourcePlacementSystem {
         // --------------------------------------------
 
         if (
-          event.code ===
-          "Escape"
+          event.code === "Escape"
         ) {
           this.cancel();
         }
@@ -245,16 +207,11 @@ export default class PowerSourcePlacementSystem {
     this.domElement.addEventListener(
       "mousedown",
       (event) => {
-        if (
-          !this.active
-        ) {
+        if (!this.active) {
           return;
         }
 
-        if (
-          event.button !==
-          0
-        ) {
+        if (event.button !== 0) {
           return;
         }
 
@@ -266,27 +223,21 @@ export default class PowerSourcePlacementSystem {
   }
 
   // ====================================================
-  // START
+  // START PLACEMENT
   // ====================================================
 
   public start(
-    item:
-      InventoryPowerSourceItem
+    item: InventoryPowerSourceItem
   ) {
-    if (
-      this.active
-    ) {
+    if (this.active) {
       this.cancel();
     }
 
-    this.activeItem =
-      item;
+    this.activeItem = item;
 
-    this.active =
-      true;
+    this.active = true;
 
-    this.rotationY =
-      0;
+    this.rotationY = 0;
 
     // ==================================================
     // POINTER LOCK
@@ -298,16 +249,12 @@ export default class PowerSourcePlacementSystem {
     ) {
       this.domElement
         .requestPointerLock()
-        .catch(
-          () => {
-            // Browser may require another click.
-          }
-        );
+        .catch(() => {
+          // Browser may require another click.
+        });
     }
 
-    this.createGhost(
-      item
-    );
+    this.createGhost(item);
   }
 
   // ====================================================
@@ -315,8 +262,7 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
 
   private createGhost(
-    item:
-      InventoryPowerSourceItem
+    item: InventoryPowerSourceItem
   ) {
     const definition =
       item.definition;
@@ -343,12 +289,9 @@ export default class PowerSourcePlacementSystem {
       );
 
     body.position.y =
-      definition.height /
-      2;
+      definition.height / 2;
 
-    group.add(
-      body
-    );
+    group.add(body);
 
     // ==================================================
     // FRONT PANEL
@@ -357,11 +300,9 @@ export default class PowerSourcePlacementSystem {
     const front =
       new THREE.Mesh(
         new THREE.BoxGeometry(
-          definition.width *
-            0.78,
+          definition.width * 0.78,
 
-          definition.height *
-            0.72,
+          definition.height * 0.72,
 
           0.025
         ),
@@ -372,24 +313,33 @@ export default class PowerSourcePlacementSystem {
     front.position.set(
       0,
 
-      definition.height *
-        0.52,
+      definition.height * 0.52,
 
-      definition.depth /
-          2 +
+      definition.depth / 2 +
         0.02
     );
 
-    group.add(
-      front
-    );
+    group.add(front);
 
     // ==================================================
     // FLOOR FOOTPRINT
     //
-    // Uses actual physical dimensions.
-    // No artificial placement gap.
+    // Exact physical dimensions.
+    // No artificial spacing.
     // ==================================================
+
+    const footprintMaterial =
+      new THREE.MeshBasicMaterial({
+        color: 0x42ff91,
+
+        transparent: true,
+
+        opacity: 0.18,
+
+        side: THREE.DoubleSide,
+
+        depthWrite: false,
+      });
 
     const footprint =
       new THREE.Mesh(
@@ -398,22 +348,7 @@ export default class PowerSourcePlacementSystem {
           definition.depth
         ),
 
-        new THREE.MeshBasicMaterial({
-          color:
-            0x42ff91,
-
-          transparent:
-            true,
-
-          opacity:
-            0.18,
-
-          side:
-            THREE.DoubleSide,
-
-          depthWrite:
-            false,
-        })
+        footprintMaterial
       );
 
     footprint.rotation.x =
@@ -425,24 +360,21 @@ export default class PowerSourcePlacementSystem {
     footprint.name =
       "placement-footprint";
 
-    group.add(
-      footprint
-    );
+    group.add(footprint);
 
-    this.ghost =
-      group;
+    this.ghost = group;
 
-    this.scene.add(
-      group
-    );
+    this.scene.add(group);
   }
 
   // ====================================================
   // UPDATE
   //
-  // Placement preview follows camera.
-  // When player movement remains active,
-  // WASD moves the preview together with player.
+  // Ghost follows camera.
+  //
+  // Once player controller remains active during
+  // placement, WASD can be used to reposition player
+  // while this preview follows.
   // ====================================================
 
   public update() {
@@ -461,12 +393,10 @@ export default class PowerSourcePlacementSystem {
       forward
     );
 
-    forward.y =
-      0;
+    forward.y = 0;
 
     if (
-      forward.lengthSq() ===
-      0
+      forward.lengthSq() === 0
     ) {
       forward.set(
         0,
@@ -503,8 +433,7 @@ export default class PowerSourcePlacementSystem {
       ) *
       this.gridSize;
 
-    target.y =
-      0;
+    target.y = 0;
 
     this.ghost.position.copy(
       target
@@ -514,7 +443,7 @@ export default class PowerSourcePlacementSystem {
       this.rotationY;
 
     // ==================================================
-    // VALIDATION
+    // VALIDATE
     // ==================================================
 
     this.validPlacement =
@@ -535,8 +464,7 @@ export default class PowerSourcePlacementSystem {
       this.rotationY >=
       Math.PI * 2
     ) {
-      this.rotationY =
-        0;
+      this.rotationY = 0;
     }
   }
 
@@ -628,8 +556,7 @@ export default class PowerSourcePlacementSystem {
     if (
       playerPosition.distanceTo(
         powerPosition
-      ) <
-      1.1
+      ) < 1.1
     ) {
       return false;
     }
@@ -637,15 +564,16 @@ export default class PowerSourcePlacementSystem {
     // ==================================================
     // CANDIDATE COLLISION BOX
     //
-    // Slightly smaller than actual model dimensions.
+    // Slightly smaller than physical object.
     //
-    // TOUCHING = allowed
-    // OVERLAPPING = blocked
+    // Touching = valid
+    // Actual overlap = invalid
     // ==================================================
 
     const collisionWidth =
       Math.max(
         0.01,
+
         width -
           this.collisionTolerance
       );
@@ -653,6 +581,7 @@ export default class PowerSourcePlacementSystem {
     const collisionDepth =
       Math.max(
         0.01,
+
         depth -
           this.collisionTolerance
       );
@@ -660,6 +589,7 @@ export default class PowerSourcePlacementSystem {
     const collisionHeight =
       Math.max(
         0.01,
+
         definition.height -
           this.collisionTolerance
       );
@@ -671,21 +601,22 @@ export default class PowerSourcePlacementSystem {
       new THREE.Vector3(
         x,
 
-        definition.height /
-          2,
+        definition.height / 2,
 
         z
       ),
 
       new THREE.Vector3(
         collisionWidth,
+
         collisionHeight,
+
         collisionDepth
       )
     );
 
     // ==================================================
-    // POWER SOURCE COLLISION
+    // OTHER POWER SOURCE COLLISION
     // ==================================================
 
     for (
@@ -698,7 +629,6 @@ export default class PowerSourcePlacementSystem {
             object
           );
 
-      // Shrink existing collision slightly.
       existingBox.expandByScalar(
         -this.collisionTolerance /
           2
@@ -716,7 +646,7 @@ export default class PowerSourcePlacementSystem {
     // ==================================================
     // EXTERNAL COLLISION
     //
-    // Mainly placed racks.
+    // Racks registered from main.ts.
     // ==================================================
 
     for (
@@ -729,7 +659,6 @@ export default class PowerSourcePlacementSystem {
             object
           );
 
-      // Allow power source to touch rack directly.
       existingBox.expandByScalar(
         -this.collisionTolerance /
           2
@@ -752,9 +681,7 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
 
   private updateGhostMaterial() {
-    if (
-      !this.ghost
-    ) {
+    if (!this.ghost) {
       return;
     }
 
@@ -778,6 +705,10 @@ export default class PowerSourcePlacementSystem {
         ) {
           return;
         }
+
+        // ----------------------------------------------
+        // FOOTPRINT
+        // ----------------------------------------------
 
         if (
           object.name ===
@@ -888,8 +819,7 @@ export default class PowerSourcePlacementSystem {
         rotationY:
           this.rotationY,
 
-        enabled:
-          true,
+        enabled: true,
       };
 
     // ==================================================
@@ -901,9 +831,7 @@ export default class PowerSourcePlacementSystem {
         item.instanceId
       );
 
-    if (
-      !removed
-    ) {
+    if (!removed) {
       this.scene.remove(
         powerObject
       );
@@ -963,38 +891,29 @@ export default class PowerSourcePlacementSystem {
 
     const bodyMaterial =
       new THREE.MeshStandardMaterial({
-        color:
-          0x0c1117,
+        color: 0x0c1117,
 
-        roughness:
-          0.38,
+        roughness: 0.38,
 
-        metalness:
-          0.82,
+        metalness: 0.82,
       });
 
     const frameMaterial =
       new THREE.MeshStandardMaterial({
-        color:
-          0x05080c,
+        color: 0x05080c,
 
-        roughness:
-          0.3,
+        roughness: 0.3,
 
-        metalness:
-          0.9,
+        metalness: 0.9,
       });
 
     const panelMaterial =
       new THREE.MeshStandardMaterial({
-        color:
-          0x121a22,
+        color: 0x121a22,
 
-        roughness:
-          0.48,
+        roughness: 0.48,
 
-        metalness:
-          0.72,
+        metalness: 0.72,
       });
 
     // ==================================================
@@ -1013,18 +932,13 @@ export default class PowerSourcePlacementSystem {
       );
 
     body.position.y =
-      definition.height /
-      2;
+      definition.height / 2;
 
-    body.castShadow =
-      true;
+    body.castShadow = true;
 
-    body.receiveShadow =
-      true;
+    body.receiveShadow = true;
 
-    group.add(
-      body
-    );
+    group.add(body);
 
     // ==================================================
     // FRONT PANEL
@@ -1033,11 +947,9 @@ export default class PowerSourcePlacementSystem {
     const front =
       new THREE.Mesh(
         new THREE.BoxGeometry(
-          definition.width *
-            0.78,
+          definition.width * 0.78,
 
-          definition.height *
-            0.72,
+          definition.height * 0.72,
 
           0.035
         ),
@@ -1048,20 +960,15 @@ export default class PowerSourcePlacementSystem {
     front.position.set(
       0,
 
-      definition.height *
-        0.52,
+      definition.height * 0.52,
 
-      definition.depth /
-          2 +
+      definition.depth / 2 +
         0.02
     );
 
-    front.castShadow =
-      true;
+    front.castShadow = true;
 
-    group.add(
-      front
-    );
+    group.add(front);
 
     // ==================================================
     // FRONT DIVIDERS
@@ -1069,8 +976,7 @@ export default class PowerSourcePlacementSystem {
 
     const dividerGeometry =
       new THREE.BoxGeometry(
-        definition.width *
-          0.66,
+        definition.width * 0.66,
 
         0.018,
 
@@ -1085,6 +991,7 @@ export default class PowerSourcePlacementSystem {
       const divider =
         new THREE.Mesh(
           dividerGeometry,
+
           frameMaterial
         );
 
@@ -1095,8 +1002,7 @@ export default class PowerSourcePlacementSystem {
           (0.3 +
             i * 0.14),
 
-        definition.depth /
-            2 +
+        definition.depth / 2 +
           0.045
       );
 
@@ -1111,14 +1017,11 @@ export default class PowerSourcePlacementSystem {
 
     const ledMaterial =
       new THREE.MeshStandardMaterial({
-        color:
-          0x45ff8a,
+        color: 0x45ff8a,
 
-        emissive:
-          0x22ff72,
+        emissive: 0x22ff72,
 
-        emissiveIntensity:
-          5,
+        emissiveIntensity: 5,
       });
 
     const led =
@@ -1133,20 +1036,15 @@ export default class PowerSourcePlacementSystem {
       );
 
     led.position.set(
-      definition.width *
-        0.28,
+      definition.width * 0.28,
 
-      definition.height *
-        0.22,
+      definition.height * 0.22,
 
-      definition.depth /
-          2 +
+      definition.depth / 2 +
         0.055
     );
 
-    group.add(
-      led
-    );
+    group.add(led);
 
     // ==================================================
     // MAIN SWITCH
@@ -1155,11 +1053,9 @@ export default class PowerSourcePlacementSystem {
     const switchBody =
       new THREE.Mesh(
         new THREE.BoxGeometry(
-          definition.width *
-            0.15,
+          definition.width * 0.15,
 
-          definition.height *
-            0.12,
+          definition.height * 0.12,
 
           0.04
         ),
@@ -1168,14 +1064,11 @@ export default class PowerSourcePlacementSystem {
       );
 
     switchBody.position.set(
-      -definition.width *
-        0.25,
+      -definition.width * 0.25,
 
-      definition.height *
-        0.22,
+      definition.height * 0.22,
 
-      definition.depth /
-          2 +
+      definition.depth / 2 +
         0.055
     );
 
@@ -1206,12 +1099,9 @@ export default class PowerSourcePlacementSystem {
       definition.height -
       0.0225;
 
-    top.castShadow =
-      true;
+    top.castShadow = true;
 
-    group.add(
-      top
-    );
+    group.add(top);
 
     // ==================================================
     // BOTTOM CAP
@@ -1223,9 +1113,7 @@ export default class PowerSourcePlacementSystem {
     bottom.position.y =
       0.0225;
 
-    group.add(
-      bottom
-    );
+    group.add(bottom);
 
     return group;
   }
@@ -1271,9 +1159,7 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
 
   public cancel() {
-    if (
-      !this.active
-    ) {
+    if (!this.active) {
       return;
     }
 
@@ -1285,28 +1171,21 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
 
   private finishPlacement() {
-    if (
-      this.ghost
-    ) {
+    if (this.ghost) {
       this.scene.remove(
         this.ghost
       );
 
-      this.ghost =
-        null;
+      this.ghost = null;
     }
 
-    this.activeItem =
-      null;
+    this.activeItem = null;
 
-    this.active =
-      false;
+    this.active = false;
 
-    this.validPlacement =
-      false;
+    this.validPlacement = false;
 
-    this.rotationY =
-      0;
+    this.rotationY = 0;
   }
 
   // ====================================================
