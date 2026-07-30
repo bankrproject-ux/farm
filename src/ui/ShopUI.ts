@@ -12,19 +12,32 @@ import {
   type RackDefinition,
 } from "../mining/RackTypes";
 
+import {
+  POWER_SOURCES,
+  type PowerSourceDefinition,
+} from "../mining/PowerTypes";
+
 // ======================================================
 // MINING TYCOON 3D
 // Shop UI
+//
+// Categories:
+// - Mining servers
+// - Server racks
+// - Power systems
 // ======================================================
 
 type ShopTab =
   | "miners"
-  | "racks";
+  | "racks"
+  | "power";
 
 export default class ShopUI {
-  private gameState: GameState;
+  private gameState:
+    GameState;
 
-  private inventory: InventorySystem;
+  private inventory:
+    InventorySystem;
 
   private root:
     HTMLDivElement;
@@ -38,7 +51,12 @@ export default class ShopUI {
   private activeTab:
     ShopTab = "miners";
 
-  private visible = false;
+  private visible =
+    false;
+
+  // ====================================================
+  // CONSTRUCTOR
+  // ====================================================
 
   constructor(
     gameState: GameState,
@@ -166,6 +184,14 @@ export default class ShopUI {
       >
         SERVER RACKS
       </button>
+
+      <button
+        type="button"
+        data-tab="power"
+        class="shop-tab"
+      >
+        POWER SYSTEMS
+      </button>
     `;
 
     panel.appendChild(
@@ -214,7 +240,7 @@ export default class ShopUI {
     );
 
     // ==================================================
-    // EVENTS
+    // CLOSE
     // ==================================================
 
     const closeButton =
@@ -228,6 +254,10 @@ export default class ShopUI {
         this.close();
       }
     );
+
+    // ==================================================
+    // TABS
+    // ==================================================
 
     tabs.addEventListener(
       "click",
@@ -249,7 +279,8 @@ export default class ShopUI {
 
         if (
           tab !== "miners" &&
-          tab !== "racks"
+          tab !== "racks" &&
+          tab !== "power"
         ) {
           return;
         }
@@ -277,7 +308,9 @@ export default class ShopUI {
       }
     );
 
-    // Escape closes shop.
+    // ==================================================
+    // ESCAPE
+    // ==================================================
 
     window.addEventListener(
       "keydown",
@@ -292,13 +325,17 @@ export default class ShopUI {
       }
     );
 
-    // Keep balance updated.
+    // ==================================================
+    // GAME STATE
+    // ==================================================
 
     this.gameState.subscribe(
       () => {
         this.updateBalance();
 
-        if (this.visible) {
+        if (
+          this.visible
+        ) {
           this.render();
         }
       }
@@ -318,7 +355,8 @@ export default class ShopUI {
   // ====================================================
 
   public open() {
-    this.visible = true;
+    this.visible =
+      true;
 
     this.root.classList.remove(
       "hidden"
@@ -328,7 +366,6 @@ export default class ShopUI {
 
     this.render();
 
-    // Release FPS mouse control.
     if (
       document.pointerLockElement
     ) {
@@ -341,7 +378,8 @@ export default class ShopUI {
   // ====================================================
 
   public close() {
-    this.visible = false;
+    this.visible =
+      false;
 
     this.root.classList.add(
       "hidden"
@@ -353,7 +391,9 @@ export default class ShopUI {
   // ====================================================
 
   public toggle() {
-    if (this.visible) {
+    if (
+      this.visible
+    ) {
       this.close();
     } else {
       this.open();
@@ -393,10 +433,20 @@ export default class ShopUI {
       "miners"
     ) {
       this.renderMiners();
+
       return;
     }
 
-    this.renderRacks();
+    if (
+      this.activeTab ===
+      "racks"
+    ) {
+      this.renderRacks();
+
+      return;
+    }
+
+    this.renderPowerSources();
   }
 
   // ====================================================
@@ -492,6 +542,7 @@ export default class ShopUI {
       <div class="hardware-stats">
         <div>
           <span>HASHRATE</span>
+
           <strong>
             ${this.formatHashrate(
               miner.hashRate
@@ -501,6 +552,7 @@ export default class ShopUI {
 
         <div>
           <span>POWER</span>
+
           <strong>
             ${this.formatPower(
               miner.powerUsage
@@ -510,6 +562,7 @@ export default class ShopUI {
 
         <div>
           <span>HEAT</span>
+
           <strong>
             ${miner.heatOutput}
           </strong>
@@ -517,6 +570,7 @@ export default class ShopUI {
 
         <div>
           <span>RACK SPACE</span>
+
           <strong>
             ${miner.rackSlots}U
           </strong>
@@ -524,6 +578,7 @@ export default class ShopUI {
 
         <div>
           <span>EFFICIENCY</span>
+
           <strong>
             ${efficiency.toFixed(
               3
@@ -590,7 +645,9 @@ export default class ShopUI {
         miner.price
       );
 
-    if (!purchased) {
+    if (
+      !purchased
+    ) {
       return;
     }
 
@@ -784,12 +841,223 @@ export default class ShopUI {
         rack.price
       );
 
-    if (!purchased) {
+    if (
+      !purchased
+    ) {
       return;
     }
 
     this.inventory.addRack(
       rack
+    );
+
+    this.render();
+  }
+
+  // ====================================================
+  // POWER SOURCES
+  // ====================================================
+
+  private renderPowerSources() {
+    const grid =
+      document.createElement(
+        "div"
+      );
+
+    grid.className =
+      "shop-grid";
+
+    for (
+      const source
+      of POWER_SOURCES
+    ) {
+      grid.appendChild(
+        this.createPowerSourceCard(
+          source
+        )
+      );
+    }
+
+    this.content.appendChild(
+      grid
+    );
+  }
+
+  // ====================================================
+  // POWER SOURCE CARD
+  // ====================================================
+
+  private createPowerSourceCard(
+    source:
+      PowerSourceDefinition
+  ): HTMLDivElement {
+    const card =
+      document.createElement(
+        "div"
+      );
+
+    card.className =
+      "shop-card";
+
+    const owned =
+      this.inventory
+        .countPowerSource(
+          source.id
+        );
+
+    const canAfford =
+      this.gameState.canAfford(
+        source.price
+      );
+
+    card.innerHTML = `
+      <div class="shop-card-top">
+        <div>
+          <span class="shop-tier">
+            ${source.tier}
+          </span>
+
+          <h3>
+            ${source.name}
+          </h3>
+
+          <small>
+            ${source.manufacturer}
+          </small>
+        </div>
+
+        ${
+          owned > 0
+            ? `
+              <div class="shop-owned">
+                INVENTORY ${owned}
+              </div>
+            `
+            : ""
+        }
+      </div>
+
+      <p class="shop-description">
+        ${source.description}
+      </p>
+
+      <div class="hardware-stats">
+        <div>
+          <span>
+            OUTPUT
+          </span>
+
+          <strong>
+            ${this.formatPower(
+              source.capacity
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            TIER
+          </span>
+
+          <strong>
+            ${source.tier.toUpperCase()}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            HEIGHT
+          </span>
+
+          <strong>
+            ${source.height.toFixed(
+              1
+            )}m
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            WIDTH
+          </span>
+
+          <strong>
+            ${source.width.toFixed(
+              1
+            )}m
+          </strong>
+        </div>
+      </div>
+
+      <div class="shop-card-bottom">
+        <div class="shop-price">
+          <span>
+            PRICE
+          </span>
+
+          <strong>
+            ${this.formatMoney(
+              source.price
+            )}
+          </strong>
+        </div>
+
+        <button
+          type="button"
+          class="shop-buy"
+          ${
+            canAfford
+              ? ""
+              : "disabled"
+          }
+        >
+          ${
+            canAfford
+              ? "BUY"
+              : "INSUFFICIENT FUNDS"
+          }
+        </button>
+      </div>
+    `;
+
+    const button =
+      card.querySelector<HTMLButtonElement>(
+        ".shop-buy"
+      );
+
+    button?.addEventListener(
+      "click",
+      () => {
+        this.buyPowerSource(
+          source
+        );
+      }
+    );
+
+    return card;
+  }
+
+  // ====================================================
+  // BUY POWER SOURCE
+  // ====================================================
+
+  private buyPowerSource(
+    source:
+      PowerSourceDefinition
+  ) {
+    const purchased =
+      this.gameState.spend(
+        source.price
+      );
+
+    if (
+      !purchased
+    ) {
+      return;
+    }
+
+    this.inventory.addPowerSource(
+      source
     );
 
     this.render();
@@ -815,7 +1083,9 @@ export default class ShopUI {
   private formatPower(
     watts: number
   ): string {
-    if (watts >= 1000) {
+    if (
+      watts >= 1000
+    ) {
       return `${(
         watts / 1000
       ).toFixed(1)} kW`;
@@ -827,7 +1097,9 @@ export default class ShopUI {
   private formatHashrate(
     hashRate: number
   ): string {
-    if (hashRate >= 1000) {
+    if (
+      hashRate >= 1000
+    ) {
       return `${(
         hashRate / 1000
       ).toFixed(2)} GH/s`;
