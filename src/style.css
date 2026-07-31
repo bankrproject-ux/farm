@@ -3763,3 +3763,102 @@ canvas {
     gap: 8px;
   }
 }
+
+/* =====================================================
+   SWITCH / DISCONNECT WALLET
+===================================================== */
+
+.landing-disconnect-button {
+  width: 100%;
+  height: 38px;
+
+  margin-top: 9px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.09);
+
+  background:
+    rgba(255, 255, 255, 0.025);
+
+  color: #667b91;
+
+  font-size: 7px;
+  font-weight: 900;
+
+  letter-spacing: 2px;
+
+  cursor: pointer;
+
+  outline: none;
+
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.landing-disconnect-button:hover:not(:disabled) {
+  color: #ff8c8c;
+
+  border-color:
+    rgba(255, 90, 90, 0.32);
+
+  background:
+    rgba(255, 70, 70, 0.055);
+
+  box-shadow:
+    inset 0 0 20px
+    rgba(255, 70, 70, 0.025);
+}
+
+.landing-disconnect-button:active:not(:disabled) {
+  background:
+    rgba(255, 70, 70, 0.09);
+}
+
+.landing-disconnect-button:disabled {
+  cursor: default;
+
+  opacity: 0.45;
+}
+
+/* Connected state */
+
+.wallet-connected
+.landing-disconnect-button {
+  border-color:
+    rgba(255, 255, 255, 0.085);
+
+  color: #64798e;
+}
+
+.wallet-connected
+.landing-disconnect-button:hover:not(:disabled) {
+  color: #ff8d8d;
+
+  border-color:
+    rgba(255, 92, 92, 0.35);
+
+  background:
+    rgba(255, 70, 70, 0.06);
+}
+
+/* Mobile */
+
+@media (max-width: 700px) {
+  .landing-disconnect-button {
+    height: 36px;
+
+    margin-top: 8px;
+
+    font-size: 6px;
+
+    letter-spacing: 1.5px;
+  }
+}
