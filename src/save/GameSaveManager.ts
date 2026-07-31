@@ -1,40 +1,48 @@
+import type {
+  InventorySaveData,
+} from "../game/InventorySystem";
+
 // ======================================================
 // MINING TYCOON 3D
 // GAME SAVE MANAGER
 // ======================================================
 //
-// Handles communication between the game client and:
+// Handles:
 //
 // GET  /api/game/load
 // POST /api/game/save
 //
-// IMPORTANT:
+// One wallet = one game save.
 //
-// This is currently persistence plumbing.
-// The backend must later become authoritative for
-// purchases and TYCON before public release.
-//
+// ======================================================
+
+// ======================================================
+// GAME SAVE DATA
 // ======================================================
 
 export type GameSaveData = {
   version: number;
 
-  inventory: Record<
-    string,
-    number
-  >;
+  inventory:
+    InventorySaveData;
 
-  placedMiners: unknown[];
+  placedMiners:
+    unknown[];
 
-  placedRacks: unknown[];
+  placedRacks:
+    unknown[];
 
-  placedPower: unknown[];
+  placedPower:
+    unknown[];
 
-  tyconBalance: number;
+  tyconBalance:
+    number;
 
-  totalMined: number;
+  totalMined:
+    number;
 
-  updatedAt: number;
+  updatedAt:
+    number;
 };
 
 // ======================================================
@@ -124,7 +132,6 @@ export default class GameSaveManager {
     const normalized =
       wallet.toLowerCase();
 
-    // Different wallet = different save cache.
     if (
       this.walletAddress !==
       normalized
@@ -164,7 +171,8 @@ export default class GameSaveManager {
           wallet
         )}`,
         {
-          method: "GET",
+          method:
+            "GET",
 
           headers: {
             Accept:
@@ -213,7 +221,7 @@ export default class GameSaveManager {
     }
 
     // ==================================================
-    // VALIDATE SAVE
+    // EXISTING PLAYER
     // ==================================================
 
     const gameState =
@@ -248,7 +256,7 @@ export default class GameSaveManager {
         normalized
       );
 
-    // Nothing changed.
+    // No changes.
     if (
       serialized ===
       this.lastSavedJson
@@ -256,8 +264,8 @@ export default class GameSaveManager {
       return;
     }
 
-    // If another request is already writing,
-    // keep only the newest state.
+    // Save already running.
+    // Keep newest state only.
     if (
       this.saving
     ) {
@@ -281,16 +289,11 @@ export default class GameSaveManager {
   ): Promise<void> {
     this.requireWallet();
 
-    const normalized =
-      this.normalizeSave(
-        state
-      );
-
     this.lastSavedJson =
       "";
 
     await this.save(
-      normalized
+      state
     );
   }
 
@@ -368,7 +371,7 @@ export default class GameSaveManager {
     }
 
     // ==================================================
-    // SAVE NEWEST QUEUED STATE
+    // PROCESS QUEUED SAVE
     // ==================================================
 
     if (
@@ -405,7 +408,9 @@ export default class GameSaveManager {
     return {
       version: 1,
 
-      inventory: {},
+      inventory: {
+        items: [],
+      },
 
       placedMiners: [],
 
@@ -429,43 +434,30 @@ export default class GameSaveManager {
   private normalizeSave(
     value: GameSaveData
   ): GameSaveData {
+    // ==================================================
+    // INVENTORY
+    // ==================================================
+
     const inventory:
-      Record<string, number> =
-        {};
+      InventorySaveData = {
+        items: [],
+      };
 
     if (
       value.inventory &&
       typeof value.inventory ===
         "object" &&
-      !Array.isArray(
-        value.inventory
+      Array.isArray(
+        value.inventory.items
       )
     ) {
-      for (
-        const [
-          key,
-          amount,
-        ] of Object.entries(
-          value.inventory
-        )
-      ) {
-        if (
-          typeof amount !==
-            "number" ||
-          !Number.isFinite(
-            amount
-          ) ||
-          amount < 0
-        ) {
-          continue;
-        }
-
-        inventory[key] =
-          Math.floor(
-            amount
-          );
-      }
+      inventory.items =
+        value.inventory.items;
     }
+
+    // ==================================================
+    // RETURN
+    // ==================================================
 
     return {
       version:
@@ -565,7 +557,7 @@ export default class GameSaveManager {
   }
 
   // ====================================================
-  // WALLET VALIDATION
+  // VALIDATE WALLET
   // ====================================================
 
   private isValidWallet(
