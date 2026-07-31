@@ -66,6 +66,9 @@ let restoringSave =
 let inventorySaveTimer:
   number | null = null;
 
+let gameStateSaveTimer:
+  number | null = null;
+
 // ======================================================
 // BUILD CURRENT SAVE
 // ======================================================
@@ -91,7 +94,7 @@ function buildCurrentSave():
       gameState.getTyconBalance(),
 
     totalMined:
-      gameState.getTotalMined(),
+      gameState.getTotalTyconMined(),
 
     updatedAt:
       Date.now(),
@@ -128,12 +131,26 @@ async function loadWalletSave(
         saved.inventory
       );
 
+      gameState.setTyconBalance(
+        saved.tyconBalance
+      );
+
+      gameState.setTotalTyconMined(
+        saved.totalMined
+      );
+
       console.log(
         "Game save loaded:",
         address,
 
         "| Inventory:",
-        inventory.getItemCount()
+        inventory.getItemCount(),
+
+        "| TYCON:",
+        gameState.getTyconBalance(),
+
+        "| Total mined:",
+        gameState.getTotalTyconMined()
       );
     }
 
@@ -143,6 +160,14 @@ async function loadWalletSave(
 
     else {
       inventory.clear();
+
+      gameState.setTyconBalance(
+        0
+      );
+
+      gameState.setTotalTyconMined(
+        0
+      );
 
       await gameSave.forceSave(
         buildCurrentSave()
@@ -163,6 +188,14 @@ async function loadWalletSave(
     );
 
     inventory.clear();
+
+    gameState.setTyconBalance(
+      0
+    );
+
+    gameState.setTotalTyconMined(
+      0
+    );
 
     gameSave.reset();
 
@@ -198,6 +231,19 @@ async function closeWalletSaveSession() {
       null;
   }
 
+  // Cancel queued GameState save.
+  if (
+    gameStateSaveTimer !==
+    null
+  ) {
+    window.clearTimeout(
+      gameStateSaveTimer
+    );
+
+    gameStateSaveTimer =
+      null;
+  }
+
   // ==================================================
   // FINAL SAVE
   // ==================================================
@@ -222,7 +268,7 @@ async function closeWalletSaveSession() {
   }
 
   // ==================================================
-  // CLEAR LOCAL INVENTORY
+  // CLEAR LOCAL PLAYER STATE
   // ==================================================
 
   restoringSave =
@@ -230,6 +276,14 @@ async function closeWalletSaveSession() {
 
   try {
     inventory.clear();
+
+    gameState.setTyconBalance(
+      0
+    );
+
+    gameState.setTotalTyconMined(
+      0
+    );
   } finally {
     restoringSave =
       false;
@@ -336,6 +390,67 @@ inventory.subscribe(
             );
         },
         350
+      );
+  }
+);
+
+// ======================================================
+// GAME STATE AUTOSAVE
+// ======================================================
+//
+// TYCON changes continuously while miners are active.
+//
+// We debounce state changes so we're not sending
+// a request to Neon every frame.
+// ======================================================
+
+gameState.subscribe(
+  () => {
+    if (
+      !saveSessionActive ||
+      restoringSave ||
+      !gameSave.getWallet()
+    ) {
+      return;
+    }
+
+    if (
+      gameStateSaveTimer !==
+      null
+    ) {
+      window.clearTimeout(
+        gameStateSaveTimer
+      );
+    }
+
+    gameStateSaveTimer =
+      window.setTimeout(
+        () => {
+          gameStateSaveTimer =
+            null;
+
+          if (
+            !saveSessionActive ||
+            restoringSave ||
+            !gameSave.getWallet()
+          ) {
+            return;
+          }
+
+          void gameSave
+            .save(
+              buildCurrentSave()
+            )
+            .catch(
+              (error) => {
+                console.error(
+                  "Game state autosave failed:",
+                  error
+                );
+              }
+            );
+        },
+        1000
       );
   }
 );
