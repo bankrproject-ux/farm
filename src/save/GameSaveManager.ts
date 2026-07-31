@@ -6,28 +6,30 @@ import type {
   SavedRackPlacement,
 } from "../game/RackPlacementSystem";
 
+import type {
+  SavedPowerSourcePlacement,
+} from "../game/PowerSourcePlacementSystem";
+
 // ======================================================
 // MINING TYCOON 3D
 // GAME SAVE MANAGER
 // ======================================================
 //
-// Handles:
+// One wallet = one persistent facility.
 //
-// GET  /api/game/load
-// POST /api/game/save
-//
-// One wallet = one game save.
-//
-// Persistent data:
+// Saved:
 //
 // - Inventory
 // - Placed racks
+// - Miners installed inside racks
+// - Placed power sources
 // - TYCON balance
 // - Total TYCON mined
 //
-// Power placement + full miner world persistence
-// will be connected next.
+// Installed miners are stored inside:
+// placedRacks[].miners
 //
+// They are NOT stored separately.
 // ======================================================
 
 // ======================================================
@@ -40,14 +42,11 @@ export type GameSaveData = {
   inventory:
     InventorySaveData;
 
-  placedMiners:
-    unknown[];
-
   placedRacks:
     SavedRackPlacement[];
 
   placedPower:
-    unknown[];
+    SavedPowerSourcePlacement[];
 
   tyconBalance:
     number;
@@ -270,7 +269,7 @@ export default class GameSaveManager {
         normalized
       );
 
-    // No changes.
+    // Nothing changed.
     if (
       serialized ===
       this.lastSavedJson
@@ -278,8 +277,8 @@ export default class GameSaveManager {
       return;
     }
 
-    // Save already running.
-    // Keep newest state only.
+    // Another save is already running.
+    // Keep only the newest state.
     if (
       this.saving
     ) {
@@ -420,13 +419,11 @@ export default class GameSaveManager {
   public createEmptySave():
     GameSaveData {
     return {
-      version: 1,
+      version: 2,
 
       inventory: {
         items: [],
       },
-
-      placedMiners: [],
 
       placedRacks: [],
 
@@ -499,6 +496,35 @@ export default class GameSaveManager {
     }
 
     // ==================================================
+    // PLACED POWER
+    // ==================================================
+
+    const placedPower:
+      SavedPowerSourcePlacement[] =
+        [];
+
+    if (
+      Array.isArray(
+        value.placedPower
+      )
+    ) {
+      for (
+        const power
+        of value.placedPower
+      ) {
+        if (
+          this.isValidPowerPlacement(
+            power
+          )
+        ) {
+          placedPower.push(
+            power
+          );
+        }
+      }
+    }
+
+    // ==================================================
     // RETURN
     // ==================================================
 
@@ -510,30 +536,18 @@ export default class GameSaveManager {
           value.version
         )
           ? Math.max(
-              1,
+              2,
               Math.floor(
                 value.version
               )
             )
-          : 1,
+          : 2,
 
       inventory,
 
-      placedMiners:
-        Array.isArray(
-          value.placedMiners
-        )
-          ? value.placedMiners
-          : [],
-
       placedRacks,
 
-      placedPower:
-        Array.isArray(
-          value.placedPower
-        )
-          ? value.placedPower
-          : [],
+      placedPower,
 
       tyconBalance:
         this.safeNumber(
@@ -601,36 +615,23 @@ export default class GameSaveManager {
       return false;
     }
 
-    if (
-      !rack.position ||
-      typeof rack.position !==
-        "object"
+    // Validate every installed miner.
+    for (
+      const installedMiner
+      of rack.miners
     ) {
-      return false;
+      if (
+        !this.isValidInstalledMiner(
+          installedMiner
+        )
+      ) {
+        return false;
+      }
     }
 
-    const position =
-      rack.position as {
-        x?: unknown;
-        y?: unknown;
-        z?: unknown;
-      };
-
     if (
-      typeof position.x !==
-        "number" ||
-      !Number.isFinite(
-        position.x
-      ) ||
-      typeof position.y !==
-        "number" ||
-      !Number.isFinite(
-        position.y
-      ) ||
-      typeof position.z !==
-        "number" ||
-      !Number.isFinite(
-        position.z
+      !this.isValidPosition(
+        rack.position
       )
     ) {
       return false;
@@ -647,6 +648,179 @@ export default class GameSaveManager {
     }
 
     return true;
+  }
+
+  // ====================================================
+  // VALIDATE INSTALLED MINER
+  // ====================================================
+
+  private isValidInstalledMiner(
+    value: unknown
+  ): boolean {
+    if (
+      !value ||
+      typeof value !==
+        "object"
+    ) {
+      return false;
+    }
+
+    const miner =
+      value as {
+        instanceId?: unknown;
+        miner?: unknown;
+        slotIndex?: unknown;
+        powered?: unknown;
+      };
+
+    if (
+      typeof miner.instanceId !==
+        "string" ||
+      miner.instanceId.length ===
+        0
+    ) {
+      return false;
+    }
+
+    if (
+      !miner.miner ||
+      typeof miner.miner !==
+        "object"
+    ) {
+      return false;
+    }
+
+    if (
+      typeof miner.slotIndex !==
+        "number" ||
+      !Number.isFinite(
+        miner.slotIndex
+      ) ||
+      miner.slotIndex < 0
+    ) {
+      return false;
+    }
+
+    if (
+      typeof miner.powered !==
+        "boolean"
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  // ====================================================
+  // VALIDATE POWER PLACEMENT
+  // ====================================================
+
+  private isValidPowerPlacement(
+    value: unknown
+  ): value is SavedPowerSourcePlacement {
+    if (
+      !value ||
+      typeof value !==
+        "object"
+    ) {
+      return false;
+    }
+
+    const power =
+      value as Partial<
+        SavedPowerSourcePlacement
+      >;
+
+    if (
+      typeof power.instanceId !==
+        "string" ||
+      power.instanceId.length ===
+        0
+    ) {
+      return false;
+    }
+
+    if (
+      !power.definition ||
+      typeof power.definition !==
+        "object"
+    ) {
+      return false;
+    }
+
+    if (
+      !this.isValidPosition(
+        power.position
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      typeof power.rotationY !==
+        "number" ||
+      !Number.isFinite(
+        power.rotationY
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      typeof power.enabled !==
+        "boolean"
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  // ====================================================
+  // VALIDATE POSITION
+  // ====================================================
+
+  private isValidPosition(
+    value: unknown
+  ): value is {
+    x: number;
+    y: number;
+    z: number;
+  } {
+    if (
+      !value ||
+      typeof value !==
+        "object"
+    ) {
+      return false;
+    }
+
+    const position =
+      value as {
+        x?: unknown;
+        y?: unknown;
+        z?: unknown;
+      };
+
+    return (
+      typeof position.x ===
+        "number" &&
+      Number.isFinite(
+        position.x
+      ) &&
+
+      typeof position.y ===
+        "number" &&
+      Number.isFinite(
+        position.y
+      ) &&
+
+      typeof position.z ===
+        "number" &&
+      Number.isFinite(
+        position.z
+      )
+    );
   }
 
   // ====================================================
