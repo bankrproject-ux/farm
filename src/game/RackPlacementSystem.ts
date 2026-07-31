@@ -10,19 +10,46 @@ import type {
 
 // ======================================================
 // MINING TYCOON 3D
-// Rack Placement System
+// RACK PLACEMENT SYSTEM
 //
-// FIX:
-// - Racks can be placed directly next to each other.
-// - No artificial collision gap.
-// - Small collision tolerance prevents touching edges
-//   from being treated as overlapping.
+// Supports:
+// - Normal rack placement
+// - Grid snapping
+// - Collision detection
+// - Rack export for persistence
+// - Rack restore from persistence
 // ======================================================
 
 export type RackPlacedCallback = (
   rack: RackInstance,
   object: THREE.Group
 ) => void;
+
+// ======================================================
+// SAVED RACK
+// ======================================================
+
+export type SavedRackPlacement = {
+  instanceId: string;
+
+  definition:
+    RackInstance["definition"];
+
+  miners:
+    RackInstance["miners"];
+
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+
+  rotationY: number;
+};
+
+// ======================================================
+// SYSTEM
+// ======================================================
 
 export default class RackPlacementSystem {
   private scene:
@@ -43,33 +70,27 @@ export default class RackPlacementSystem {
   private ghost:
     THREE.Group | null = null;
 
-  private active = false;
+  private active =
+    false;
 
-  private validPlacement = false;
+  private validPlacement =
+    false;
 
-  private rotationY = 0;
+  private rotationY =
+    0;
 
-  // Distance in front of player.
   private readonly placementDistance =
     4;
 
-  // Facility boundaries.
   private readonly roomLimitX =
     8.7;
 
   private readonly roomLimitZ =
     8.7;
 
-  // Snap rack position to floor grid.
   private readonly gridSize =
     0.5;
 
-  // Tiny collision tolerance.
-  //
-  // This SHRINKS collision boxes slightly.
-  // Result:
-  // objects may touch each other,
-  // but still cannot overlap.
   private readonly collisionTolerance =
     0.015;
 
@@ -150,20 +171,12 @@ export default class RackPlacementSystem {
           return;
         }
 
-        // --------------------------------------------
-        // R = ROTATE RACK
-        // --------------------------------------------
-
         if (
           event.code === "KeyR" &&
           !event.repeat
         ) {
           this.rotate();
         }
-
-        // --------------------------------------------
-        // ESC = CANCEL
-        // --------------------------------------------
 
         if (
           event.code === "Escape"
@@ -172,10 +185,6 @@ export default class RackPlacementSystem {
         }
       }
     );
-
-    // ==================================================
-    // LEFT CLICK = PLACE
-    // ==================================================
 
     this.domElement.addEventListener(
       "mousedown",
@@ -217,10 +226,6 @@ export default class RackPlacementSystem {
     this.rotationY =
       0;
 
-    // ----------------------------------------------
-    // POINTER LOCK
-    // ----------------------------------------------
-
     if (
       document.pointerLockElement !==
       this.domElement
@@ -228,8 +233,7 @@ export default class RackPlacementSystem {
       this.domElement
         .requestPointerLock()
         .catch(() => {
-          // Browser may require another click.
-          // Placement remains active.
+          // Placement can remain active.
         });
     }
 
@@ -239,7 +243,7 @@ export default class RackPlacementSystem {
   }
 
   // ====================================================
-  // CREATE GHOST RACK
+  // CREATE GHOST
   // ====================================================
 
   private createGhost(
@@ -253,10 +257,6 @@ export default class RackPlacementSystem {
 
     group.name =
       "rack-placement-ghost";
-
-    // ----------------------------------------------
-    // MAIN BODY
-    // ----------------------------------------------
 
     const body =
       new THREE.Mesh(
@@ -274,10 +274,6 @@ export default class RackPlacementSystem {
     group.add(
       body
     );
-
-    // ----------------------------------------------
-    // FRONT SLOT DETAILS
-    // ----------------------------------------------
 
     const slotCount =
       Math.min(
@@ -297,13 +293,18 @@ export default class RackPlacementSystem {
       const slot =
         new THREE.Mesh(
           new THREE.BoxGeometry(
-            definition.width * 0.82,
+            definition.width *
+              0.82,
+
             Math.max(
               0.025,
-              slotHeight * 0.55
+              slotHeight *
+                0.55
             ),
+
             0.025
           ),
+
           this.validMaterial
         );
 
@@ -316,10 +317,16 @@ export default class RackPlacementSystem {
 
       slot.position.set(
         0,
+
         0.15 +
           normalizedSlot *
-            (definition.height - 0.3),
-        definition.depth / 2 +
+            (
+              definition.height -
+              0.3
+            ),
+
+        definition.depth /
+          2 +
           0.02
       );
 
@@ -328,16 +335,13 @@ export default class RackPlacementSystem {
       );
     }
 
-    // ----------------------------------------------
-    // FLOOR FOOTPRINT
-    // ----------------------------------------------
-
     const footprint =
       new THREE.Mesh(
         new THREE.PlaneGeometry(
           definition.width,
           definition.depth
         ),
+
         new THREE.MeshBasicMaterial({
           color: 0x42ff91,
           transparent: true,
@@ -370,13 +374,6 @@ export default class RackPlacementSystem {
 
   // ====================================================
   // UPDATE
-  //
-  // Called every frame.
-  //
-  // Placement position follows camera.
-  // Once main.ts allows PlayerController.update()
-  // during placement, WASD automatically moves
-  // the placement preview with the player.
   // ====================================================
 
   public update() {
@@ -395,12 +392,12 @@ export default class RackPlacementSystem {
       forward
     );
 
-    // Placement always stays on floor.
     forward.y =
       0;
 
     if (
-      forward.lengthSq() === 0
+      forward.lengthSq() ===
+      0
     ) {
       forward.set(
         0,
@@ -418,10 +415,6 @@ export default class RackPlacementSystem {
           forward,
           this.placementDistance
         );
-
-    // ----------------------------------------------
-    // GRID SNAP
-    // ----------------------------------------------
 
     target.x =
       Math.round(
@@ -446,10 +439,6 @@ export default class RackPlacementSystem {
 
     this.ghost.rotation.y =
       this.rotationY;
-
-    // ----------------------------------------------
-    // VALIDATION
-    // ----------------------------------------------
 
     this.validPlacement =
       this.checkPlacement();
@@ -490,10 +479,6 @@ export default class RackPlacementSystem {
     const definition =
       this.activeItem.definition;
 
-    // ----------------------------------------------
-    // ROTATED DIMENSIONS
-    // ----------------------------------------------
-
     const rotated =
       Math.abs(
         Math.sin(
@@ -523,9 +508,9 @@ export default class RackPlacementSystem {
     const z =
       this.ghost.position.z;
 
-    // ----------------------------------------------
-    // ROOM BOUNDARIES
-    // ----------------------------------------------
+    // ==================================================
+    // ROOM BOUNDS
+    // ==================================================
 
     if (
       x - halfWidth <
@@ -540,9 +525,9 @@ export default class RackPlacementSystem {
       return false;
     }
 
-    // ----------------------------------------------
+    // ==================================================
     // PLAYER COLLISION
-    // ----------------------------------------------
+    // ==================================================
 
     const playerPosition =
       new THREE.Vector2(
@@ -564,21 +549,9 @@ export default class RackPlacementSystem {
       return false;
     }
 
-    // ----------------------------------------------
-    // CANDIDATE COLLISION BOX
-    //
-    // IMPORTANT:
-    //
-    // Old version:
-    //
-    // width + 0.25
-    // depth + 0.25
-    //
-    // That created an artificial gap.
-    //
-    // New version slightly SHRINKS the physical
-    // dimensions so touching edges are allowed.
-    // ----------------------------------------------
+    // ==================================================
+    // RACK COLLISION
+    // ==================================================
 
     const collisionWidth =
       Math.max(
@@ -600,23 +573,23 @@ export default class RackPlacementSystem {
     candidateBox.setFromCenterAndSize(
       new THREE.Vector3(
         x,
-        definition.height / 2,
+        definition.height /
+          2,
         z
       ),
+
       new THREE.Vector3(
         collisionWidth,
+
         Math.max(
           0.01,
           definition.height -
             this.collisionTolerance
         ),
+
         collisionDepth
       )
     );
-
-    // ----------------------------------------------
-    // OTHER RACK COLLISION
-    // ----------------------------------------------
 
     for (
       const object
@@ -628,7 +601,6 @@ export default class RackPlacementSystem {
             object
           );
 
-      // Shrink existing collision box slightly.
       existingBox.expandByScalar(
         -this.collisionTolerance /
           2
@@ -702,7 +674,7 @@ export default class RackPlacementSystem {
   }
 
   // ====================================================
-  // CONFIRM
+  // CONFIRM PLACEMENT
   // ====================================================
 
   private confirmPlacement() {
@@ -721,10 +693,6 @@ export default class RackPlacementSystem {
     const definition =
       item.definition;
 
-    // ----------------------------------------------
-    // VERIFY INVENTORY
-    // ----------------------------------------------
-
     const inventoryItem =
       this.inventory.getItem(
         item.instanceId
@@ -739,10 +707,6 @@ export default class RackPlacementSystem {
 
       return;
     }
-
-    // ----------------------------------------------
-    // CREATE REAL RACK
-    // ----------------------------------------------
 
     const rackObject =
       this.createRealRack(
@@ -759,10 +723,6 @@ export default class RackPlacementSystem {
     this.scene.add(
       rackObject
     );
-
-    // ----------------------------------------------
-    // CREATE GAME INSTANCE
-    // ----------------------------------------------
 
     const rackInstance:
       RackInstance = {
@@ -788,10 +748,6 @@ export default class RackPlacementSystem {
           this.rotationY,
       };
 
-    // ----------------------------------------------
-    // REMOVE FROM INVENTORY
-    // ----------------------------------------------
-
     const removed =
       this.inventory.removeItem(
         item.instanceId
@@ -807,9 +763,157 @@ export default class RackPlacementSystem {
       return;
     }
 
-    // ----------------------------------------------
-    // STORE
-    // ----------------------------------------------
+    this.placedRackObjects.push(
+      rackObject
+    );
+
+    this.placedRackInstances.push(
+      rackInstance
+    );
+
+    this.onRackPlaced(
+      rackInstance,
+      rackObject
+    );
+
+    this.finishPlacement();
+  }
+
+  // ====================================================
+  // RESTORE PLACED RACK
+  //
+  // IMPORTANT:
+  // This does NOT remove anything from inventory.
+  // Saved placed racks are already outside inventory.
+  // ====================================================
+
+  public restoreRack(
+    saved:
+      SavedRackPlacement
+  ): RackInstance | null {
+    if (
+      !saved ||
+      typeof saved !==
+        "object"
+    ) {
+      return null;
+    }
+
+    if (
+      typeof saved.instanceId !==
+        "string" ||
+      !saved.instanceId
+    ) {
+      return null;
+    }
+
+    if (
+      !saved.definition ||
+      typeof saved.definition !==
+        "object"
+    ) {
+      return null;
+    }
+
+    if (
+      !saved.position ||
+      typeof saved.position !==
+        "object"
+    ) {
+      return null;
+    }
+
+    const x =
+      saved.position.x;
+
+    const y =
+      saved.position.y;
+
+    const z =
+      saved.position.z;
+
+    const rotationY =
+      saved.rotationY;
+
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(z) ||
+      !Number.isFinite(
+        rotationY
+      )
+    ) {
+      return null;
+    }
+
+    // Avoid restoring duplicate rack.
+    const existing =
+      this.placedRackInstances.find(
+        (rack) =>
+          rack.instanceId ===
+          saved.instanceId
+      );
+
+    if (existing) {
+      return existing;
+    }
+
+    const fakeInventoryItem:
+      InventoryRackItem = {
+        instanceId:
+          saved.instanceId,
+
+        type:
+          "rack",
+
+        definition:
+          saved.definition,
+
+        purchasedAt:
+          0,
+      };
+
+    const rackObject =
+      this.createRealRack(
+        fakeInventoryItem
+      );
+
+    rackObject.position.set(
+      x,
+      y,
+      z
+    );
+
+    rackObject.rotation.y =
+      rotationY;
+
+    this.scene.add(
+      rackObject
+    );
+
+    const rackInstance:
+      RackInstance = {
+        instanceId:
+          saved.instanceId,
+
+        definition:
+          saved.definition,
+
+        miners:
+          Array.isArray(
+            saved.miners
+          )
+            ? saved.miners
+            : [],
+
+        position: {
+          x,
+          y,
+          z,
+        },
+
+        rotationY,
+      };
 
     this.placedRackObjects.push(
       rackObject
@@ -819,16 +923,116 @@ export default class RackPlacementSystem {
       rackInstance
     );
 
-    // ----------------------------------------------
-    // CALLBACK
-    // ----------------------------------------------
-
+    // Run exactly the same registration path
+    // used by a normally placed rack.
     this.onRackPlaced(
       rackInstance,
       rackObject
     );
 
-    this.finishPlacement();
+    return rackInstance;
+  }
+
+  // ====================================================
+  // RESTORE MULTIPLE RACKS
+  // ====================================================
+
+  public restoreRacks(
+    racks:
+      SavedRackPlacement[]
+  ) {
+    if (
+      !Array.isArray(
+        racks
+      )
+    ) {
+      return;
+    }
+
+    for (
+      const rack
+      of racks
+    ) {
+      this.restoreRack(
+        rack
+      );
+    }
+  }
+
+  // ====================================================
+  // EXPORT PLACED RACKS
+  // ====================================================
+
+  public exportPlacedRacks():
+    SavedRackPlacement[] {
+    return this
+      .placedRackInstances
+      .map(
+        (
+          rack
+        ): SavedRackPlacement => {
+          return {
+            instanceId:
+              rack.instanceId,
+
+            definition: {
+              ...rack.definition,
+            },
+
+            miners:
+              Array.isArray(
+                rack.miners
+              )
+                ? rack.miners.map(
+                    (miner) => ({
+                      ...miner,
+
+                      miner: {
+                        ...miner.miner,
+                      },
+                    })
+                  )
+                : [],
+
+            position: {
+              x:
+                rack.position.x,
+
+              y:
+                rack.position.y,
+
+              z:
+                rack.position.z,
+            },
+
+            rotationY:
+              rack.rotationY,
+          };
+        }
+      );
+  }
+
+  // ====================================================
+  // CLEAR PLACED RACKS
+  // ====================================================
+
+  public clearPlacedRacks() {
+    this.cancel();
+
+    for (
+      const object
+      of this.placedRackObjects
+    ) {
+      this.scene.remove(
+        object
+      );
+    }
+
+    this.placedRackObjects =
+      [];
+
+    this.placedRackInstances =
+      [];
   }
 
   // ====================================================
@@ -849,10 +1053,6 @@ export default class RackPlacementSystem {
 
     group.userData.rackInstanceId =
       item.instanceId;
-
-    // ----------------------------------------------
-    // MATERIALS
-    // ----------------------------------------------
 
     const frameMaterial =
       new THREE.MeshStandardMaterial({
@@ -875,9 +1075,9 @@ export default class RackPlacementSystem {
         metalness: 0.68,
       });
 
-    // ----------------------------------------------
+    // ==================================================
     // SIDE PANELS
-    // ----------------------------------------------
+    // ==================================================
 
     const sideThickness =
       0.07;
@@ -893,9 +1093,14 @@ export default class RackPlacementSystem {
       );
 
     leftSide.position.set(
-      -definition.width / 2 +
-        sideThickness / 2,
-      definition.height / 2,
+      -definition.width /
+        2 +
+        sideThickness /
+          2,
+
+      definition.height /
+        2,
+
       0
     );
 
@@ -913,16 +1118,18 @@ export default class RackPlacementSystem {
       leftSide.clone();
 
     rightSide.position.x =
-      definition.width / 2 -
-      sideThickness / 2;
+      definition.width /
+        2 -
+      sideThickness /
+        2;
 
     group.add(
       rightSide
     );
 
-    // ----------------------------------------------
-    // TOP / BOTTOM FRAME
-    // ----------------------------------------------
+    // ==================================================
+    // TOP / BOTTOM
+    // ==================================================
 
     const top =
       new THREE.Mesh(
@@ -955,17 +1162,19 @@ export default class RackPlacementSystem {
       bottom
     );
 
-    // ----------------------------------------------
+    // ==================================================
     // REAR PANEL
-    // ----------------------------------------------
+    // ==================================================
 
     const rear =
       new THREE.Mesh(
         new THREE.BoxGeometry(
           definition.width -
             0.12,
+
           definition.height -
             0.16,
+
           0.05
         ),
         frameMaterial
@@ -973,8 +1182,12 @@ export default class RackPlacementSystem {
 
     rear.position.set(
       0,
-      definition.height / 2,
-      -definition.depth / 2 +
+
+      definition.height /
+        2,
+
+      -definition.depth /
+        2 +
         0.03
     );
 
@@ -988,9 +1201,9 @@ export default class RackPlacementSystem {
       rear
     );
 
-    // ----------------------------------------------
-    // EMPTY RACK SLOTS
-    // ----------------------------------------------
+    // ==================================================
+    // EMPTY SLOTS
+    // ==================================================
 
     const slotHeight =
       definition.height /
@@ -1007,20 +1220,27 @@ export default class RackPlacementSystem {
           new THREE.BoxGeometry(
             definition.width *
               0.78,
+
             Math.max(
               0.018,
-              slotHeight * 0.16
+              slotHeight *
+                0.16
             ),
+
             0.035
           ),
+
           slotMaterial
         );
 
       slot.position.set(
         0,
+
         slotHeight *
           (i + 0.5),
-        definition.depth / 2 -
+
+        definition.depth /
+          2 -
           0.02
       );
 
@@ -1032,9 +1252,9 @@ export default class RackPlacementSystem {
       );
     }
 
-    // ----------------------------------------------
+    // ==================================================
     // FEET
-    // ----------------------------------------------
+    // ==================================================
 
     const footGeometry =
       new THREE.BoxGeometry(
@@ -1045,30 +1265,42 @@ export default class RackPlacementSystem {
 
     const footPositions = [
       [
-        -definition.width / 2 +
+        -definition.width /
+          2 +
           0.15,
-        -definition.depth / 2 +
+
+        -definition.depth /
+          2 +
           0.15,
       ],
 
       [
-        definition.width / 2 -
+        definition.width /
+          2 -
           0.15,
-        -definition.depth / 2 +
+
+        -definition.depth /
+          2 +
           0.15,
       ],
 
       [
-        -definition.width / 2 +
+        -definition.width /
+          2 +
           0.15,
-        definition.depth / 2 -
+
+        definition.depth /
+          2 -
           0.15,
       ],
 
       [
-        definition.width / 2 -
+        definition.width /
+          2 -
           0.15,
-        definition.depth / 2 -
+
+        definition.depth /
+          2 -
           0.15,
       ],
     ];
@@ -1156,11 +1388,13 @@ export default class RackPlacementSystem {
 
   public getPlacedRacks():
     readonly RackInstance[] {
-    return this.placedRackInstances;
+    return this
+      .placedRackInstances;
   }
 
   public getPlacedRackObjects():
     readonly THREE.Group[] {
-    return this.placedRackObjects;
+    return this
+      .placedRackObjects;
   }
 }
