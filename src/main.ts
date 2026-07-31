@@ -17,6 +17,10 @@ import WalletUI from "./ui/WalletUI";
 
 import WalletManager from "./wallet/WalletManager";
 
+import GameSaveManager, {
+  type GameSaveData,
+} from "./save/GameSaveManager";
+
 // ======================================================
 // MINING TYCOON 3D
 // MAIN
@@ -47,6 +51,198 @@ const powerSystem =
   new PowerSystem();
 
 // ======================================================
+// SAVE SYSTEM
+// ======================================================
+
+const gameSave =
+  new GameSaveManager();
+
+let saveSessionActive =
+  false;
+
+let restoringSave =
+  false;
+
+let inventorySaveTimer:
+  number | null = null;
+
+// ======================================================
+// BUILD CURRENT SAVE
+// ======================================================
+
+function buildCurrentSave():
+  GameSaveData {
+  return {
+    version: 1,
+
+    inventory:
+      inventory.exportSave(),
+
+    // World placement persistence
+    // will be added after inventory
+    // persistence is confirmed working.
+    placedMiners: [],
+
+    placedRacks: [],
+
+    placedPower: [],
+
+    tyconBalance:
+      gameState.getTyconBalance(),
+
+    totalMined:
+      gameState.getTotalMined(),
+
+    updatedAt:
+      Date.now(),
+  };
+}
+
+// ======================================================
+// LOAD WALLET SAVE
+// ======================================================
+
+async function loadWalletSave(
+  address: string
+) {
+  saveSessionActive =
+    false;
+
+  restoringSave =
+    true;
+
+  gameSave.setWallet(
+    address
+  );
+
+  try {
+    const saved =
+      await gameSave.load();
+
+    // ==================================================
+    // EXISTING PLAYER
+    // ==================================================
+
+    if (saved) {
+      inventory.restoreSave(
+        saved.inventory
+      );
+
+      console.log(
+        "Game save loaded:",
+        address,
+
+        "| Inventory:",
+        inventory.getItemCount()
+      );
+    }
+
+    // ==================================================
+    // NEW PLAYER
+    // ==================================================
+
+    else {
+      inventory.clear();
+
+      await gameSave.forceSave(
+        buildCurrentSave()
+      );
+
+      console.log(
+        "New game save created:",
+        address
+      );
+    }
+
+    saveSessionActive =
+      true;
+  } catch (error) {
+    console.error(
+      "Could not load game save:",
+      error
+    );
+
+    inventory.clear();
+
+    gameSave.reset();
+
+    saveSessionActive =
+      false;
+
+    throw error;
+  } finally {
+    restoringSave =
+      false;
+  }
+}
+
+// ======================================================
+// CLOSE WALLET SAVE SESSION
+// ======================================================
+
+async function closeWalletSaveSession() {
+  // Stop autosave immediately.
+  saveSessionActive =
+    false;
+
+  // Cancel queued inventory save.
+  if (
+    inventorySaveTimer !==
+    null
+  ) {
+    window.clearTimeout(
+      inventorySaveTimer
+    );
+
+    inventorySaveTimer =
+      null;
+  }
+
+  // ==================================================
+  // FINAL SAVE
+  // ==================================================
+
+  if (
+    gameSave.getWallet()
+  ) {
+    try {
+      await gameSave.forceSave(
+        buildCurrentSave()
+      );
+
+      console.log(
+        "Final game save complete."
+      );
+    } catch (error) {
+      console.error(
+        "Final save before disconnect failed:",
+        error
+      );
+    }
+  }
+
+  // ==================================================
+  // CLEAR LOCAL INVENTORY
+  // ==================================================
+
+  restoringSave =
+    true;
+
+  try {
+    inventory.clear();
+  } finally {
+    restoringSave =
+      false;
+  }
+
+  gameSave.reset();
+
+  console.log(
+    "Game save session closed."
+  );
+}
+
+// ======================================================
 // WALLET
 // ======================================================
 
@@ -55,11 +251,94 @@ const wallet =
 
 const walletUI =
   new WalletUI(
-    wallet
+    wallet,
+
+    async (
+      address: string
+    ) => {
+      await loadWalletSave(
+        address
+      );
+    },
+
+    async () => {
+      await closeWalletSaveSession();
+    }
   );
 
 // Keep reference alive.
 void walletUI;
+
+// ======================================================
+// INVENTORY AUTOSAVE
+// ======================================================
+
+inventory.subscribe(
+  () => {
+    if (
+      !saveSessionActive ||
+      restoringSave ||
+      !gameSave.getWallet()
+    ) {
+      return;
+    }
+
+    // ----------------------------------------------
+    // Debounce.
+    //
+    // BUY may trigger several UI/state updates.
+    // We only save newest inventory state.
+    // ----------------------------------------------
+
+    if (
+      inventorySaveTimer !==
+      null
+    ) {
+      window.clearTimeout(
+        inventorySaveTimer
+      );
+    }
+
+    inventorySaveTimer =
+      window.setTimeout(
+        () => {
+          inventorySaveTimer =
+            null;
+
+          if (
+            !saveSessionActive ||
+            restoringSave ||
+            !gameSave.getWallet()
+          ) {
+            return;
+          }
+
+          void gameSave
+            .save(
+              buildCurrentSave()
+            )
+            .then(
+              () => {
+                console.log(
+                  "Inventory autosaved:",
+                  inventory.getItemCount(),
+                  "items"
+                );
+              }
+            )
+            .catch(
+              (error) => {
+                console.error(
+                  "Inventory autosave failed:",
+                  error
+                );
+              }
+            );
+        },
+        350
+      );
+  }
+);
 
 // ======================================================
 // SCENE
@@ -779,12 +1058,6 @@ powerSystem.subscribe(
 
 // ======================================================
 // SHOP
-// ======================================================
-//
-// Hardware purchases:
-// wallet ETH -> treasury.
-//
-// TYCON is not spent here.
 // ======================================================
 
 const shop =
