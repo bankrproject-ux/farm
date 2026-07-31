@@ -494,11 +494,11 @@ hud.innerHTML = `
   <div class="stats">
     <div class="stat">
       <span class="stat-label">
-        BALANCE
+        TYCON BALANCE
       </span>
 
-      <strong data-hud="balance">
-        $5,000.00
+      <strong data-hud="tycon">
+        0.0000 TYCON
       </strong>
     </div>
 
@@ -548,9 +548,9 @@ app.appendChild(
 // HUD REFERENCES
 // ======================================================
 
-const balanceHUD =
+const tyconHUD =
   hud.querySelector<HTMLElement>(
-    '[data-hud="balance"]'
+    '[data-hud="tycon"]'
   );
 
 const hashrateHUD =
@@ -579,22 +579,32 @@ const crosshair =
   );
 
 // ======================================================
-// FORMATTERS
+// FORMAT TYCON
 // ======================================================
 
-function formatMoney(
+function formatTycon(
   value: number
 ): string {
-  return new Intl.NumberFormat(
+  if (
+    !Number.isFinite(
+      value
+    )
+  ) {
+    return "0.0000 TYCON";
+  }
+
+  return `${value.toLocaleString(
     "en-US",
     {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
     }
-  ).format(value);
+  )} TYCON`;
 }
+
+// ======================================================
+// FORMAT HASHRATE
+// ======================================================
 
 function formatHashrate(
   value: number
@@ -622,6 +632,10 @@ function formatHashrate(
   )} MH/s`;
 }
 
+// ======================================================
+// FORMAT POWER
+// ======================================================
+
 function formatPower(
   value: number
 ): string {
@@ -645,21 +659,27 @@ function formatPower(
 
 gameState.subscribe(
   (state) => {
-    if (balanceHUD) {
-      balanceHUD.textContent =
-        formatMoney(
-          state.getBalance()
+    if (
+      tyconHUD
+    ) {
+      tyconHUD.textContent =
+        formatTycon(
+          state.getTyconBalance()
         );
     }
 
-    if (hashrateHUD) {
+    if (
+      hashrateHUD
+    ) {
       hashrateHUD.textContent =
         formatHashrate(
           state.getHashrate()
         );
     }
 
-    if (powerHUD) {
+    if (
+      powerHUD
+    ) {
       powerHUD.textContent =
         formatPower(
           state.getPowerUsage()
@@ -760,11 +780,17 @@ powerSystem.subscribe(
 // ======================================================
 // SHOP
 // ======================================================
+//
+// Hardware purchases:
+// wallet ETH -> treasury.
+//
+// TYCON is not spent here.
+// ======================================================
 
 const shop =
   new ShopUI(
-    gameState,
-    inventory
+    inventory,
+    wallet
   );
 
 // ======================================================
@@ -1013,7 +1039,9 @@ function updateInteractionState() {
 // ======================================================
 
 function updateHUDState() {
-  if (crosshair) {
+  if (
+    crosshair
+  ) {
     crosshair.style.display =
       anyMenuOpen()
         ? "none"
