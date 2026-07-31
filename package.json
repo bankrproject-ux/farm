@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.1",
     "three": "^0.178.0",
     "viem": "^2.33.3"
   },
