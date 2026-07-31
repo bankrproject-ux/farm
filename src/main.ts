@@ -4,7 +4,9 @@ import "./style.css";
 import PlayerController from "./game/PlayerController";
 import GameState from "./game/GameState";
 import InventorySystem from "./game/InventorySystem";
-import RackPlacementSystem from "./game/RackPlacementSystem";
+import RackPlacementSystem, {
+  type SavedRackPlacement,
+} from "./game/RackPlacementSystem";
 import RackInteractionSystem from "./game/RackInteractionSystem";
 import MinerVisualSystem from "./game/MinerVisualSystem";
 import PowerSystem from "./game/PowerSystem";
@@ -69,6 +71,26 @@ let inventorySaveTimer:
 let gameStateSaveTimer:
   number | null = null;
 
+let placementSaveTimer:
+  number | null = null;
+
+// ======================================================
+// RACK SAVE STATE
+// ======================================================
+//
+// rackPlacement itself is created later because it
+// depends on scene/camera/world systems.
+//
+// Until then we keep the loaded rack data here.
+// ======================================================
+
+let rackPlacement:
+  RackPlacementSystem | null =
+    null;
+
+let pendingRackRestore:
+  SavedRackPlacement[] = [];
+
 // ======================================================
 // BUILD CURRENT SAVE
 // ======================================================
@@ -81,12 +103,13 @@ function buildCurrentSave():
     inventory:
       inventory.exportSave(),
 
-    // World placement persistence
-    // will be added after inventory
-    // persistence is confirmed working.
     placedMiners: [],
 
-    placedRacks: [],
+    placedRacks:
+      rackPlacement
+        ? rackPlacement
+            .exportPlacedRacks()
+        : pendingRackRestore,
 
     placedPower: [],
 
@@ -99,6 +122,66 @@ function buildCurrentSave():
     updatedAt:
       Date.now(),
   };
+}
+
+// ======================================================
+// SCHEDULE WORLD SAVE
+// ======================================================
+
+function schedulePlacementSave() {
+  if (
+    !saveSessionActive ||
+    restoringSave ||
+    !gameSave.getWallet()
+  ) {
+    return;
+  }
+
+  if (
+    placementSaveTimer !==
+    null
+  ) {
+    window.clearTimeout(
+      placementSaveTimer
+    );
+  }
+
+  placementSaveTimer =
+    window.setTimeout(
+      () => {
+        placementSaveTimer =
+          null;
+
+        if (
+          !saveSessionActive ||
+          restoringSave ||
+          !gameSave.getWallet()
+        ) {
+          return;
+        }
+
+        void gameSave
+          .save(
+            buildCurrentSave()
+          )
+          .then(
+            () => {
+              console.log(
+                "World placement autosaved."
+              );
+            }
+          )
+          .catch(
+            (error) => {
+              console.error(
+                "World placement autosave failed:",
+                error
+              );
+            }
+          );
+      },
+      350
+    );
 }
 
 // ======================================================
@@ -127,9 +210,31 @@ async function loadWalletSave(
     // ==================================================
 
     if (saved) {
+      // ----------------------------------------------
+      // Clear previous local world first.
+      // ----------------------------------------------
+
+      if (
+        rackPlacement
+      ) {
+        rackPlacement
+          .clearPlacedRacks();
+      }
+
+      pendingRackRestore =
+        [];
+
+      // ----------------------------------------------
+      // Inventory
+      // ----------------------------------------------
+
       inventory.restoreSave(
         saved.inventory
       );
+
+      // ----------------------------------------------
+      // TYCON
+      // ----------------------------------------------
 
       gameState.setTyconBalance(
         saved.tyconBalance
@@ -139,12 +244,30 @@ async function loadWalletSave(
         saved.totalMined
       );
 
+      // ----------------------------------------------
+      // RACKS
+      // ----------------------------------------------
+
+      if (
+        rackPlacement
+      ) {
+        rackPlacement.restoreRacks(
+          saved.placedRacks
+        );
+      } else {
+        pendingRackRestore =
+          saved.placedRacks;
+      }
+
       console.log(
         "Game save loaded:",
         address,
 
         "| Inventory:",
         inventory.getItemCount(),
+
+        "| Racks:",
+        saved.placedRacks.length,
 
         "| TYCON:",
         gameState.getTyconBalance(),
@@ -160,6 +283,16 @@ async function loadWalletSave(
 
     else {
       inventory.clear();
+
+      if (
+        rackPlacement
+      ) {
+        rackPlacement
+          .clearPlacedRacks();
+      }
+
+      pendingRackRestore =
+        [];
 
       gameState.setTyconBalance(
         0
@@ -188,6 +321,16 @@ async function loadWalletSave(
     );
 
     inventory.clear();
+
+    if (
+      rackPlacement
+    ) {
+      rackPlacement
+        .clearPlacedRacks();
+    }
+
+    pendingRackRestore =
+      [];
 
     gameState.setTyconBalance(
       0
@@ -218,7 +361,10 @@ async function closeWalletSaveSession() {
   saveSessionActive =
     false;
 
-  // Cancel queued inventory save.
+  // ==================================================
+  // CANCEL QUEUED SAVES
+  // ==================================================
+
   if (
     inventorySaveTimer !==
     null
@@ -231,7 +377,6 @@ async function closeWalletSaveSession() {
       null;
   }
 
-  // Cancel queued GameState save.
   if (
     gameStateSaveTimer !==
     null
@@ -241,6 +386,18 @@ async function closeWalletSaveSession() {
     );
 
     gameStateSaveTimer =
+      null;
+  }
+
+  if (
+    placementSaveTimer !==
+    null
+  ) {
+    window.clearTimeout(
+      placementSaveTimer
+    );
+
+    placementSaveTimer =
       null;
   }
 
@@ -276,6 +433,16 @@ async function closeWalletSaveSession() {
 
   try {
     inventory.clear();
+
+    if (
+      rackPlacement
+    ) {
+      rackPlacement
+        .clearPlacedRacks();
+    }
+
+    pendingRackRestore =
+      [];
 
     gameState.setTyconBalance(
       0
@@ -337,13 +504,6 @@ inventory.subscribe(
       return;
     }
 
-    // ----------------------------------------------
-    // Debounce.
-    //
-    // BUY may trigger several UI/state updates.
-    // We only save newest inventory state.
-    // ----------------------------------------------
-
     if (
       inventorySaveTimer !==
       null
@@ -396,12 +556,6 @@ inventory.subscribe(
 
 // ======================================================
 // GAME STATE AUTOSAVE
-// ======================================================
-//
-// TYCON changes continuously while miners are active.
-//
-// We debounce state changes so we're not sending
-// a request to Neon every frame.
 // ======================================================
 
 gameState.subscribe(
@@ -1201,6 +1355,8 @@ const rackManagement =
 
       powerSystem.recalculate();
 
+      schedulePlacementSave();
+
       console.log(
         "Miner installed:",
         installedMiner
@@ -1247,10 +1403,8 @@ const rackInteraction =
       }
 
       if (
-        rackPlacement
-          .isActive() ||
-        powerPlacement
-          .isActive()
+        rackPlacement?.isActive() ||
+        powerPlacement.isActive()
       ) {
         return;
       }
@@ -1309,7 +1463,7 @@ const powerPlacement =
 // RACK PLACEMENT
 // ======================================================
 
-const rackPlacement =
+rackPlacement =
   new RackPlacementSystem(
     scene,
     camera,
@@ -1339,12 +1493,79 @@ const rackPlacement =
           object
         );
 
+      // ----------------------------------------------
+      // RESTORE MINER VISUALS
+      // ----------------------------------------------
+
+      if (
+        Array.isArray(
+          rack.miners
+        )
+      ) {
+        for (
+          const installedMiner
+          of rack.miners
+        ) {
+          minerVisuals.addMiner(
+            rack,
+            installedMiner
+          );
+        }
+      }
+
+      powerSystem.recalculate();
+
+      // ----------------------------------------------
+      // SAVE NORMAL PLACEMENT
+      //
+      // During restore, restoringSave=true,
+      // so schedulePlacementSave() safely ignores it.
+      // ----------------------------------------------
+
+      schedulePlacementSave();
+
       console.log(
-        "Rack placed:",
-        rack.instanceId
+        "Rack registered:",
+        rack.instanceId,
+
+        "| Miners:",
+        rack.miners.length
       );
     }
   );
+
+// ======================================================
+// APPLY PENDING RACK RESTORE
+// ======================================================
+//
+// Wallet authentication may have finished before the
+// world placement systems were initialized.
+// ======================================================
+
+if (
+  pendingRackRestore.length >
+  0
+) {
+  restoringSave =
+    true;
+
+  try {
+    rackPlacement.restoreRacks(
+      pendingRackRestore
+    );
+
+    console.log(
+      "Pending racks restored:",
+      pendingRackRestore.length
+    );
+
+    pendingRackRestore =
+      [];
+  } finally {
+    restoringSave =
+      false;
+  }
+}
 
 // ======================================================
 // INVENTORY
@@ -1361,7 +1582,7 @@ const inventoryUI =
         false
       );
 
-      rackPlacement.start(
+      rackPlacement?.start(
         rackItem
       );
 
@@ -1369,7 +1590,7 @@ const inventoryUI =
     },
 
     (powerItem) => {
-      rackPlacement.cancel();
+      rackPlacement?.cancel();
 
       rackInteraction.setEnabled(
         false
@@ -1403,7 +1624,10 @@ function anyMenuOpen():
 function anyPlacementActive():
   boolean {
   return (
-    rackPlacement.isActive() ||
+    (
+      rackPlacement?.isActive() ??
+      false
+    ) ||
     powerPlacement.isActive()
   );
 }
@@ -1468,7 +1692,7 @@ function updateHUDState() {
   }
 
   if (
-    rackPlacement.isActive()
+    rackPlacement?.isActive()
   ) {
     help.textContent =
       "WASD MOVE  •  PLACE RACK  •  LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
@@ -1684,7 +1908,7 @@ function updateUIStateWatcher() {
         ? "rack"
         : "",
 
-      rackPlacement.isActive()
+      rackPlacement?.isActive()
         ? "rack-placement"
         : "",
 
@@ -1765,7 +1989,7 @@ function animate() {
     );
   }
 
-  rackPlacement.update();
+  rackPlacement?.update();
 
   powerPlacement.update();
 
