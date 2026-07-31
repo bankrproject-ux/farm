@@ -4,7 +4,35 @@ import {
 
 // ======================================================
 // MINING TYCOON 3D
-// LOAD GAME SAVE
+// LOAD GAME SAVE + OFFLINE MINING
+// ======================================================
+
+// ======================================================
+// OFFLINE MINING SETTINGS
+// ======================================================
+//
+// Must match GameState:
+//
+// 1 MH/s = 0.00015 TYCON / second.
+//
+// Offline mining is capped at 12 hours.
+// ======================================================
+
+const TYCON_PER_MH_PER_SECOND =
+  0.00015;
+
+const MAX_OFFLINE_SECONDS =
+  12 * 60 * 60;
+
+// Ignore tiny disconnect/reconnect windows.
+//
+// This also avoids showing silly offline rewards
+// when the player reconnects immediately.
+const MIN_OFFLINE_SECONDS =
+  5;
+
+// ======================================================
+// API TYPES
 // ======================================================
 
 type ApiRequest = {
@@ -31,6 +59,35 @@ type ApiResponse = {
 };
 
 // ======================================================
+// GENERIC OBJECT
+// ======================================================
+
+type JsonObject = Record<
+  string,
+  unknown
+>;
+
+// ======================================================
+// OFFLINE RESULT
+// ======================================================
+
+type OfflineMiningResult = {
+  elapsedSeconds: number;
+
+  rewardedSeconds: number;
+
+  capped: boolean;
+
+  activeHashrate: number;
+
+  powerCapacity: number;
+
+  powerUsed: number;
+
+  tyconEarned: number;
+};
+
+// ======================================================
 // WALLET VALIDATION
 // ======================================================
 
@@ -40,6 +97,367 @@ function isValidWallet(
   return /^0x[a-fA-F0-9]{40}$/.test(
     wallet
   );
+}
+
+// ======================================================
+// OBJECT CHECK
+// ======================================================
+
+function isObject(
+  value: unknown
+): value is JsonObject {
+  return (
+    typeof value ===
+      "object" &&
+    value !== null &&
+    !Array.isArray(
+      value
+    )
+  );
+}
+
+// ======================================================
+// SAFE NUMBER
+// ======================================================
+
+function safeNumber(
+  value: unknown
+): number {
+  if (
+    typeof value !==
+      "number" ||
+    !Number.isFinite(
+      value
+    ) ||
+    value < 0
+  ) {
+    return 0;
+  }
+
+  return value;
+}
+
+// ======================================================
+// GET POWER CAPACITY
+// ======================================================
+
+function getPowerCapacity(
+  gameState: JsonObject
+): number {
+  const placedPower =
+    gameState.placedPower;
+
+  if (
+    !Array.isArray(
+      placedPower
+    )
+  ) {
+    return 0;
+  }
+
+  let totalCapacity =
+    0;
+
+  for (
+    const source
+    of placedPower
+  ) {
+    if (
+      !isObject(
+        source
+      )
+    ) {
+      continue;
+    }
+
+    // Disabled power sources provide no electricity.
+
+    if (
+      source.enabled !==
+      true
+    ) {
+      continue;
+    }
+
+    const definition =
+      source.definition;
+
+    if (
+      !isObject(
+        definition
+      )
+    ) {
+      continue;
+    }
+
+    totalCapacity +=
+      safeNumber(
+        definition.capacity
+      );
+  }
+
+  return totalCapacity;
+}
+
+// ======================================================
+// CALCULATE ACTIVE MINING
+// ======================================================
+//
+// This intentionally mirrors PowerSystem:
+//
+// 1. Determine total enabled facility power.
+// 2. Walk racks in stored order.
+// 3. Sort miners by slotIndex inside each rack.
+// 4. Power miners while capacity remains.
+// 5. Miner contributes hashrate only if powered.
+//
+// We DO NOT trust saved `powered` flags here.
+// Server calculates power availability itself.
+// ======================================================
+
+function calculateActiveMining(
+  gameState: JsonObject
+): {
+  activeHashrate: number;
+  powerCapacity: number;
+  powerUsed: number;
+} {
+  const powerCapacity =
+    getPowerCapacity(
+      gameState
+    );
+
+  let availablePower =
+    powerCapacity;
+
+  let activeHashrate =
+    0;
+
+  let powerUsed =
+    0;
+
+  const placedRacks =
+    gameState.placedRacks;
+
+  if (
+    !Array.isArray(
+      placedRacks
+    )
+  ) {
+    return {
+      activeHashrate,
+      powerCapacity,
+      powerUsed,
+    };
+  }
+
+  for (
+    const rack
+    of placedRacks
+  ) {
+    if (
+      !isObject(
+        rack
+      )
+    ) {
+      continue;
+    }
+
+    const miners =
+      rack.miners;
+
+    if (
+      !Array.isArray(
+        miners
+      )
+    ) {
+      continue;
+    }
+
+    // Same behavior as PowerSystem:
+    // lower rack slots receive power first.
+
+    const sortedMiners =
+      [...miners].sort(
+        (
+          first,
+          second
+        ) => {
+          const firstSlot =
+            isObject(first)
+              ? safeNumber(
+                  first.slotIndex
+                )
+              : 0;
+
+          const secondSlot =
+            isObject(second)
+              ? safeNumber(
+                  second.slotIndex
+                )
+              : 0;
+
+          return (
+            firstSlot -
+            secondSlot
+          );
+        }
+      );
+
+    for (
+      const installedMiner
+      of sortedMiners
+    ) {
+      if (
+        !isObject(
+          installedMiner
+        )
+      ) {
+        continue;
+      }
+
+      const miner =
+        installedMiner.miner;
+
+      if (
+        !isObject(
+          miner
+        )
+      ) {
+        continue;
+      }
+
+      const requiredPower =
+        safeNumber(
+          miner.powerUsage
+        );
+
+      const hashRate =
+        safeNumber(
+          miner.hashRate
+        );
+
+      // Invalid / zero-power hardware should not
+      // accidentally generate rewards.
+
+      if (
+        requiredPower <= 0 ||
+        hashRate <= 0
+      ) {
+        continue;
+      }
+
+      if (
+        availablePower <
+        requiredPower
+      ) {
+        continue;
+      }
+
+      availablePower -=
+        requiredPower;
+
+      powerUsed +=
+        requiredPower;
+
+      activeHashrate +=
+        hashRate;
+    }
+  }
+
+  return {
+    activeHashrate,
+    powerCapacity,
+    powerUsed,
+  };
+}
+
+// ======================================================
+// CALCULATE OFFLINE REWARD
+// ======================================================
+
+function calculateOfflineMining(
+  gameState: JsonObject,
+  updatedAt: Date,
+  now: Date
+): OfflineMiningResult {
+  const rawElapsed =
+    Math.floor(
+      (
+        now.getTime() -
+        updatedAt.getTime()
+      ) /
+        1000
+    );
+
+  const elapsedSeconds =
+    Number.isFinite(
+      rawElapsed
+    )
+      ? Math.max(
+          0,
+          rawElapsed
+        )
+      : 0;
+
+  const capped =
+    elapsedSeconds >
+    MAX_OFFLINE_SECONDS;
+
+  let rewardedSeconds =
+    Math.min(
+      elapsedSeconds,
+      MAX_OFFLINE_SECONDS
+    );
+
+  if (
+    rewardedSeconds <
+    MIN_OFFLINE_SECONDS
+  ) {
+    rewardedSeconds =
+      0;
+  }
+
+  const {
+    activeHashrate,
+    powerCapacity,
+    powerUsed,
+  } =
+    calculateActiveMining(
+      gameState
+    );
+
+  const tyconEarned =
+    rewardedSeconds > 0 &&
+    activeHashrate > 0
+      ? activeHashrate *
+        TYCON_PER_MH_PER_SECOND *
+        rewardedSeconds
+      : 0;
+
+  return {
+    elapsedSeconds,
+
+    rewardedSeconds,
+
+    capped,
+
+    activeHashrate,
+
+    powerCapacity,
+
+    powerUsed,
+
+    tyconEarned:
+      Number.isFinite(
+        tyconEarned
+      )
+        ? Math.max(
+            0,
+            tyconEarned
+          )
+        : 0,
+  };
 }
 
 // ======================================================
@@ -66,6 +484,7 @@ export default async function handler(
       .status(405)
       .json({
         ok: false,
+
         error:
           "Method not allowed.",
       });
@@ -92,6 +511,7 @@ export default async function handler(
       .status(500)
       .json({
         ok: false,
+
         error:
           "Database is not configured.",
       });
@@ -113,12 +533,15 @@ export default async function handler(
 
   if (
     !wallet ||
-    !isValidWallet(wallet)
+    !isValidWallet(
+      wallet
+    )
   ) {
     return res
       .status(400)
       .json({
         ok: false,
+
         error:
           "Invalid wallet address.",
       });
@@ -133,7 +556,9 @@ export default async function handler(
 
   try {
     const sql =
-      neon(databaseUrl);
+      neon(
+        databaseUrl
+      );
 
     // ==================================================
     // CREATE TABLE IF NEEDED
@@ -150,6 +575,11 @@ export default async function handler(
 
     // ==================================================
     // LOAD SAVE
+    //
+    // Also fetch PostgreSQL NOW().
+    //
+    // Both timestamps therefore come from the database
+    // clock instead of the player's browser clock.
     // ==================================================
 
     const rows =
@@ -158,7 +588,8 @@ export default async function handler(
           wallet_address,
           game_state,
           created_at,
-          updated_at
+          updated_at,
+          NOW() AS server_now
         FROM game_saves
         WHERE wallet_address =
           ${normalizedWallet}
@@ -182,7 +613,11 @@ export default async function handler(
           wallet:
             normalizedWallet,
 
-          gameState: null,
+          gameState:
+            null,
+
+          offlineMining:
+            null,
         });
     }
 
@@ -193,6 +628,166 @@ export default async function handler(
     const save =
       rows[0];
 
+    const rawState =
+      save.game_state;
+
+    const gameState:
+      JsonObject =
+      isObject(
+        rawState
+      )
+        ? {
+            ...rawState,
+          }
+        : {};
+
+    const updatedAt =
+      new Date(
+        save.updated_at
+      );
+
+    const serverNow =
+      new Date(
+        save.server_now
+      );
+
+    // ==================================================
+    // OFFLINE MINING
+    // ==================================================
+
+    const offlineMining =
+      calculateOfflineMining(
+        gameState,
+        updatedAt,
+        serverNow
+      );
+
+    // ==================================================
+    // APPLY OFFLINE REWARD
+    // ==================================================
+
+    const previousBalance =
+      safeNumber(
+        gameState.tyconBalance
+      );
+
+    const previousTotalMined =
+      safeNumber(
+        gameState.totalMined
+      );
+
+    if (
+      offlineMining.tyconEarned >
+      0
+    ) {
+      gameState.tyconBalance =
+        previousBalance +
+        offlineMining.tyconEarned;
+
+      gameState.totalMined =
+        previousTotalMined +
+        offlineMining.tyconEarned;
+    } else {
+      // Normalize these values even when no reward
+      // was generated.
+
+      gameState.tyconBalance =
+        previousBalance;
+
+      gameState.totalMined =
+        previousTotalMined;
+    }
+
+    // Client still uses this field for save metadata.
+    // Use server time here.
+
+    gameState.updatedAt =
+      serverNow.getTime();
+
+    // ==================================================
+    // CONSUME OFFLINE PERIOD
+    //
+    // IMPORTANT:
+    //
+    // We update updated_at on LOAD.
+    //
+    // Therefore refreshing/reloading immediately cannot
+    // claim the same offline period a second time.
+    // ==================================================
+
+    const serializedState =
+      JSON.stringify(
+        gameState
+      );
+
+    const updatedRows =
+      await sql`
+        UPDATE game_saves
+
+        SET
+          game_state =
+            ${serializedState}::jsonb,
+
+          updated_at =
+            NOW()
+
+        WHERE
+          wallet_address =
+            ${normalizedWallet}
+
+        RETURNING
+          wallet_address,
+          game_state,
+          created_at,
+          updated_at
+      `;
+
+    const updatedSave =
+      updatedRows[0];
+
+    if (
+      !updatedSave
+    ) {
+      throw new Error(
+        "Save disappeared during offline mining update."
+      );
+    }
+
+    // ==================================================
+    // LOG
+    // ==================================================
+
+    console.log(
+      "Offline mining processed:",
+
+      normalizedWallet,
+
+      "| elapsed:",
+      offlineMining.elapsedSeconds,
+      "seconds",
+
+      "| rewarded:",
+      offlineMining.rewardedSeconds,
+      "seconds",
+
+      "| hashrate:",
+      offlineMining.activeHashrate,
+      "MH/s",
+
+      "| power:",
+      offlineMining.powerUsed,
+      "/",
+      offlineMining.powerCapacity,
+      "W",
+
+      "| TYCON:",
+      offlineMining.tyconEarned
+    );
+
+    // ==================================================
+    // RESPONSE
+    // ==================================================
+
     return res
       .status(200)
       .json({
@@ -201,16 +796,18 @@ export default async function handler(
         exists: true,
 
         wallet:
-          save.wallet_address,
+          updatedSave.wallet_address,
 
         gameState:
-          save.game_state,
+          updatedSave.game_state,
 
         createdAt:
-          save.created_at,
+          updatedSave.created_at,
 
         updatedAt:
-          save.updated_at,
+          updatedSave.updated_at,
+
+        offlineMining,
       });
   } catch (error) {
     console.error(
