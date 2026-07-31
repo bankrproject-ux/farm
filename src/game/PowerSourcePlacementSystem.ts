@@ -12,8 +12,8 @@ import type {
 // MINING TYCOON 3D
 // POWER SOURCE PLACEMENT SYSTEM
 //
-// Handles:
-// - Power source placement
+// Supports:
+// - Normal power source placement
 // - Ghost preview
 // - Grid snapping
 // - Rotation
@@ -21,17 +21,35 @@ import type {
 // - Player collision
 // - Rack collision
 // - Power source collision
-//
-// Placement behavior:
-// - Objects may sit directly next to each other
-// - No artificial spacing between objects
-// - Actual overlap is still blocked
+// - Export for persistence
+// - Restore from persistence
 // ======================================================
 
 export type PowerSourcePlacedCallback = (
   source: PowerSourceInstance,
   object: THREE.Group
 ) => void;
+
+// ======================================================
+// SAVED POWER SOURCE
+// ======================================================
+
+export type SavedPowerSourcePlacement = {
+  instanceId: string;
+
+  definition:
+    PowerSourceInstance["definition"];
+
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+
+  rotationY: number;
+
+  enabled: boolean;
+};
 
 // ======================================================
 // SYSTEM
@@ -70,12 +88,6 @@ export default class PowerSourcePlacementSystem {
 
   private readonly gridSize = 0.5;
 
-  /*
-   * Collision boxes are reduced very slightly.
-   *
-   * This prevents two objects that merely TOUCH
-   * from being interpreted as overlapping.
-   */
   private readonly collisionTolerance =
     0.015;
 
@@ -91,8 +103,6 @@ export default class PowerSourcePlacementSystem {
 
   // ====================================================
   // EXTERNAL COLLISION OBJECTS
-  //
-  // Used primarily for racks.
   // ====================================================
 
   private collisionObjects:
@@ -174,20 +184,12 @@ export default class PowerSourcePlacementSystem {
   // ====================================================
 
   private bindEvents() {
-    // ==================================================
-    // KEYBOARD
-    // ==================================================
-
     window.addEventListener(
       "keydown",
       (event) => {
         if (!this.active) {
           return;
         }
-
-        // ----------------------------------------------
-        // R = ROTATE
-        // ----------------------------------------------
 
         if (
           event.code === "KeyR" &&
@@ -196,10 +198,6 @@ export default class PowerSourcePlacementSystem {
           this.rotate();
         }
 
-        // ----------------------------------------------
-        // ESC = CANCEL
-        // ----------------------------------------------
-
         if (
           event.code === "Escape"
         ) {
@@ -207,10 +205,6 @@ export default class PowerSourcePlacementSystem {
         }
       }
     );
-
-    // ==================================================
-    // LEFT CLICK = PLACE
-    // ==================================================
 
     this.domElement.addEventListener(
       "mousedown",
@@ -250,10 +244,6 @@ export default class PowerSourcePlacementSystem {
     this.rotationY = 0;
 
     this.createGhost(item);
-
-    // ==================================================
-    // POINTER LOCK
-    // ==================================================
 
     if (
       document.pointerLockElement !==
@@ -376,11 +366,6 @@ export default class PowerSourcePlacementSystem {
 
   // ====================================================
   // UPDATE
-  //
-  // Placement follows player/camera.
-  //
-  // WASD remains controlled by PlayerController.
-  // As the player moves, the placement ghost moves too.
   // ====================================================
 
   public update() {
@@ -391,10 +376,6 @@ export default class PowerSourcePlacementSystem {
     ) {
       return;
     }
-
-    // ==================================================
-    // CAMERA FORWARD
-    // ==================================================
 
     const forward =
       new THREE.Vector3();
@@ -417,10 +398,6 @@ export default class PowerSourcePlacementSystem {
 
     forward.normalize();
 
-    // ==================================================
-    // TARGET POSITION
-    // ==================================================
-
     const target =
       this.camera.position
         .clone()
@@ -428,10 +405,6 @@ export default class PowerSourcePlacementSystem {
           forward,
           this.placementDistance
         );
-
-    // ==================================================
-    // GRID SNAP
-    // ==================================================
 
     target.x =
       Math.round(
@@ -455,10 +428,6 @@ export default class PowerSourcePlacementSystem {
 
     this.ghost.rotation.y =
       this.rotationY;
-
-    // ==================================================
-    // VALIDATE
-    // ==================================================
 
     this.validPlacement =
       this.checkPlacement();
@@ -502,10 +471,6 @@ export default class PowerSourcePlacementSystem {
 
     const definition =
       this.activeItem.definition;
-
-    // ==================================================
-    // ROTATED DIMENSIONS
-    // ==================================================
 
     const rotated =
       Math.abs(
@@ -585,21 +550,7 @@ export default class PowerSourcePlacementSystem {
     }
 
     // ==================================================
-    // CANDIDATE COLLISION BOX
-    //
-    // Slightly smaller than actual physical size.
-    //
-    // Touching:
-    //
-    // [ RACK ][ POWER ]
-    //
-    // = VALID
-    //
-    // Overlap:
-    //
-    // [ RACK [ POWER ] ]
-    //
-    // = INVALID
+    // COLLISION BOX
     // ==================================================
 
     const collisionWidth =
@@ -675,7 +626,7 @@ export default class PowerSourcePlacementSystem {
     }
 
     // ==================================================
-    // RACK / EXTERNAL COLLISION
+    // EXTERNAL / RACK COLLISION
     // ==================================================
 
     for (
@@ -706,11 +657,6 @@ export default class PowerSourcePlacementSystem {
 
   // ====================================================
   // SHRINK COLLISION BOX
-  //
-  // THREE.Box3.intersectsBox() considers touching
-  // boundaries an intersection.
-  //
-  // Shrinking by a tiny amount lets objects touch.
   // ====================================================
 
   private shrinkBox(
@@ -775,10 +721,6 @@ export default class PowerSourcePlacementSystem {
           return;
         }
 
-        // ----------------------------------------------
-        // FOOTPRINT
-        // ----------------------------------------------
-
         if (
           object.name ===
           "placement-footprint"
@@ -824,10 +766,6 @@ export default class PowerSourcePlacementSystem {
     const definition =
       item.definition;
 
-    // ==================================================
-    // VERIFY ITEM STILL EXISTS
-    // ==================================================
-
     const inventoryItem =
       this.inventory.getItem(
         item.instanceId
@@ -842,10 +780,6 @@ export default class PowerSourcePlacementSystem {
 
       return;
     }
-
-    // ==================================================
-    // CREATE REAL POWER SOURCE
-    // ==================================================
 
     const powerObject =
       this.createRealPowerSource(
@@ -862,10 +796,6 @@ export default class PowerSourcePlacementSystem {
     this.scene.add(
       powerObject
     );
-
-    // ==================================================
-    // CREATE INSTANCE
-    // ==================================================
 
     const powerInstance:
       PowerSourceInstance = {
@@ -891,10 +821,6 @@ export default class PowerSourcePlacementSystem {
         enabled: true,
       };
 
-    // ==================================================
-    // REMOVE FROM INVENTORY
-    // ==================================================
-
     const removed =
       this.inventory.removeItem(
         item.instanceId
@@ -910,9 +836,151 @@ export default class PowerSourcePlacementSystem {
       return;
     }
 
-    // ==================================================
-    // REGISTER PLACED OBJECT
-    // ==================================================
+    this.placedPowerObjects.push(
+      powerObject
+    );
+
+    this.placedPowerInstances.push(
+      powerInstance
+    );
+
+    this.onPowerSourcePlaced(
+      powerInstance,
+      powerObject
+    );
+
+    this.finishPlacement();
+  }
+
+  // ====================================================
+  // RESTORE POWER SOURCE
+  //
+  // Does NOT remove anything from inventory.
+  // A placed power source already lives in the world.
+  // ====================================================
+
+  public restorePowerSource(
+    saved:
+      SavedPowerSourcePlacement
+  ): PowerSourceInstance | null {
+    if (
+      !saved ||
+      typeof saved !==
+        "object"
+    ) {
+      return null;
+    }
+
+    if (
+      typeof saved.instanceId !==
+        "string" ||
+      !saved.instanceId
+    ) {
+      return null;
+    }
+
+    if (
+      !saved.definition ||
+      typeof saved.definition !==
+        "object"
+    ) {
+      return null;
+    }
+
+    if (
+      !saved.position ||
+      typeof saved.position !==
+        "object"
+    ) {
+      return null;
+    }
+
+    const x =
+      saved.position.x;
+
+    const y =
+      saved.position.y;
+
+    const z =
+      saved.position.z;
+
+    const rotationY =
+      saved.rotationY;
+
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(z) ||
+      !Number.isFinite(
+        rotationY
+      )
+    ) {
+      return null;
+    }
+
+    // Prevent duplicate restore.
+    const existing =
+      this.placedPowerInstances.find(
+        (source) =>
+          source.instanceId ===
+          saved.instanceId
+      );
+
+    if (existing) {
+      return existing;
+    }
+
+    const fakeInventoryItem:
+      InventoryPowerSourceItem = {
+        instanceId:
+          saved.instanceId,
+
+        type:
+          "power_source",
+
+        definition:
+          saved.definition,
+
+        purchasedAt: 0,
+      };
+
+    const powerObject =
+      this.createRealPowerSource(
+        fakeInventoryItem
+      );
+
+    powerObject.position.set(
+      x,
+      y,
+      z
+    );
+
+    powerObject.rotation.y =
+      rotationY;
+
+    this.scene.add(
+      powerObject
+    );
+
+    const powerInstance:
+      PowerSourceInstance = {
+        instanceId:
+          saved.instanceId,
+
+        definition:
+          saved.definition,
+
+        position: {
+          x,
+          y,
+          z,
+        },
+
+        rotationY,
+
+        enabled:
+          saved.enabled !== false,
+      };
 
     this.placedPowerObjects.push(
       powerObject
@@ -922,20 +990,103 @@ export default class PowerSourcePlacementSystem {
       powerInstance
     );
 
-    // ==================================================
-    // CALLBACK
-    // ==================================================
-
+    // Same registration path as normal placement.
     this.onPowerSourcePlaced(
       powerInstance,
       powerObject
     );
 
-    // ==================================================
-    // FINISH
-    // ==================================================
+    return powerInstance;
+  }
 
-    this.finishPlacement();
+  // ====================================================
+  // RESTORE MULTIPLE POWER SOURCES
+  // ====================================================
+
+  public restorePowerSources(
+    sources:
+      SavedPowerSourcePlacement[]
+  ) {
+    if (
+      !Array.isArray(
+        sources
+      )
+    ) {
+      return;
+    }
+
+    for (
+      const source
+      of sources
+    ) {
+      this.restorePowerSource(
+        source
+      );
+    }
+  }
+
+  // ====================================================
+  // EXPORT POWER SOURCES
+  // ====================================================
+
+  public exportPlacedPowerSources():
+    SavedPowerSourcePlacement[] {
+    return this
+      .placedPowerInstances
+      .map(
+        (
+          source
+        ): SavedPowerSourcePlacement => {
+          return {
+            instanceId:
+              source.instanceId,
+
+            definition: {
+              ...source.definition,
+            },
+
+            position: {
+              x:
+                source.position.x,
+
+              y:
+                source.position.y,
+
+              z:
+                source.position.z,
+            },
+
+            rotationY:
+              source.rotationY,
+
+            enabled:
+              source.enabled,
+          };
+        }
+      );
+  }
+
+  // ====================================================
+  // CLEAR PLACED POWER SOURCES
+  // ====================================================
+
+  public clearPlacedPowerSources() {
+    this.cancel();
+
+    for (
+      const object
+      of this.placedPowerObjects
+    ) {
+      this.scene.remove(
+        object
+      );
+    }
+
+    this.placedPowerObjects =
+      [];
+
+    this.placedPowerInstances =
+      [];
   }
 
   // ====================================================
@@ -1206,8 +1357,6 @@ export default class PowerSourcePlacementSystem {
 
   // ====================================================
   // REGISTER EXTERNAL COLLISION OBJECT
-  //
-  // main.ts can register rack meshes here.
   // ====================================================
 
   public registerCollisionObject(
@@ -1238,6 +1387,15 @@ export default class PowerSourcePlacementSystem {
         (current) =>
           current !== object
       );
+  }
+
+  // ====================================================
+  // CLEAR EXTERNAL COLLISION OBJECTS
+  // ====================================================
+
+  public clearCollisionObjects() {
+    this.collisionObjects =
+      [];
   }
 
   // ====================================================
