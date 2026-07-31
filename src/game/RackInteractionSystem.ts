@@ -41,9 +41,6 @@ export default class RackInteractionSystem {
   private enabled =
     true;
 
-  // Player must be reasonably close
-  // before rack can be managed.
-
   private readonly maxDistance =
     3.2;
 
@@ -56,10 +53,6 @@ export default class RackInteractionSystem {
 
     this.onInteract =
       onInteract;
-
-    // ==================================================
-    // INTERACTION PROMPT
-    // ==================================================
 
     this.prompt =
       document.createElement(
@@ -88,10 +81,6 @@ export default class RackInteractionSystem {
     document.body.appendChild(
       this.prompt
     );
-
-    // ==================================================
-    // KEYBOARD
-    // ==================================================
 
     window.addEventListener(
       "keydown",
@@ -124,9 +113,6 @@ export default class RackInteractionSystem {
 
   // ====================================================
   // REGISTER RACK
-  //
-  // Called whenever a rack is successfully
-  // placed in the facility.
   // ====================================================
 
   public registerRack(
@@ -144,9 +130,6 @@ export default class RackInteractionSystem {
       return;
     }
 
-    // Store rack ID on all rack meshes.
-    // This also makes debugging easier later.
-
     object.traverse(
       (child) => {
         child.userData.rackInstanceId =
@@ -162,9 +145,6 @@ export default class RackInteractionSystem {
 
   // ====================================================
   // UNREGISTER RACK
-  //
-  // Useful later if we add:
-  // sell rack / move rack / destroy rack.
   // ====================================================
 
   public unregisterRack(
@@ -184,6 +164,26 @@ export default class RackInteractionSystem {
     ) {
       this.clearTarget();
     }
+  }
+
+  // ====================================================
+  // CLEAR
+  //
+  // Used when:
+  // - wallet disconnects
+  // - player switches wallet
+  // - another facility is loaded
+  //
+  // IMPORTANT:
+  // This only clears registered interaction references.
+  // RackPlacementSystem owns the actual world objects.
+  // ====================================================
+
+  public clear() {
+    this.clearTarget();
+
+    this.racks =
+      [];
   }
 
   // ====================================================
@@ -208,8 +208,6 @@ export default class RackInteractionSystem {
 
   // ====================================================
   // UPDATE
-  //
-  // Call every frame.
   // ====================================================
 
   public update() {
@@ -224,9 +222,6 @@ export default class RackInteractionSystem {
       this.clearTarget();
       return;
     }
-
-    // Ray comes directly from center
-    // of screen / crosshair.
 
     this.raycaster.setFromCamera(
       new THREE.Vector2(
@@ -254,9 +249,6 @@ export default class RackInteractionSystem {
       this.clearTarget();
       return;
     }
-
-    // Find first intersection that is
-    // actually close enough to player.
 
     const validIntersection =
       intersections.find(
