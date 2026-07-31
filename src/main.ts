@@ -21,6 +21,7 @@ import ShopUI from "./ui/ShopUI";
 import InventoryUI from "./ui/InventoryUI";
 import RackManagementUI from "./ui/RackManagementUI";
 import WalletUI from "./ui/WalletUI";
+import OfflineMiningUI from "./ui/OfflineMiningUI";
 
 import WalletManager from "./wallet/WalletManager";
 
@@ -75,6 +76,9 @@ const powerSystem =
 
 const gameSave =
   new GameSaveManager();
+
+const offlineMiningUI =
+  new OfflineMiningUI();
 
 let saveSessionActive =
   false;
@@ -428,6 +432,31 @@ async function loadWalletSave(
         "| Total mined:",
         gameState.getTotalTyconMined()
       );
+
+      // ----------------------------------------------
+      // OFFLINE MINING POPUP
+      // ----------------------------------------------
+
+      const offlineMining =
+        gameSave.getLastOfflineMining();
+
+      if (
+        offlineMining &&
+        offlineMining.tyconEarned > 0
+      ) {
+        offlineMiningUI.show(
+          offlineMining,
+          () => {
+            gameSave.clearLastOfflineMining();
+
+            updateInteractionState();
+
+            updateHUDState();
+          }
+        );
+      } else {
+        gameSave.clearLastOfflineMining();
+      }
     }
 
     // ==================================================
@@ -1736,7 +1765,8 @@ function anyMenuOpen():
   return (
     shop.isOpen() ||
     inventoryUI.isOpen() ||
-    rackManagement.isOpen()
+    rackManagement.isOpen() ||
+    offlineMiningUI.isOpen()
   );
 }
 
@@ -1787,6 +1817,15 @@ function updateHUDState() {
   }
 
   if (!help) {
+    return;
+  }
+
+  if (
+    offlineMiningUI.isOpen()
+  ) {
+    help.textContent =
+      "OFFLINE MINING REWARD";
+
     return;
   }
 
@@ -1864,6 +1903,12 @@ window.addEventListener(
     }
 
     if (
+      offlineMiningUI.isOpen()
+    ) {
+      return;
+    }
+
+    if (
       anyPlacementActive()
     ) {
       return;
@@ -1908,6 +1953,12 @@ window.addEventListener(
     }
 
     if (
+      offlineMiningUI.isOpen()
+    ) {
+      return;
+    }
+
+    if (
       anyPlacementActive()
     ) {
       return;
@@ -1946,6 +1997,12 @@ window.addEventListener(
     if (
       event.code !==
       "Escape"
+    ) {
+      return;
+    }
+
+    if (
+      offlineMiningUI.isOpen()
     ) {
       return;
     }
@@ -2032,6 +2089,10 @@ function updateUIStateWatcher() {
 
       rackManagement.isOpen()
         ? "rack"
+        : "",
+
+      offlineMiningUI.isOpen()
+        ? "offline-mining"
         : "",
 
       rackPlacement?.isActive()
