@@ -10,34 +10,11 @@ import type {
 // ======================================================
 // MINING TYCOON 3D
 // FACILITY POWER SYSTEM
-//
-// Handles:
-// - Facility electrical capacity
-// - Power source registration
-// - Miner power allocation
-// - Automatic overload handling
-//
-// IMPORTANT:
-//
-// Electricity is controlled by FACILITY CAPACITY.
-//
-// Rack maxPower is no longer used as a hard limit.
-// Rack capacity is determined by physical U space,
-// while PowerSystem determines whether installed
-// miners actually receive electricity.
-// ======================================================
-
-// ======================================================
-// POWER SYSTEM LISTENER
 // ======================================================
 
 export type PowerSystemListener = (
   system: PowerSystem
 ) => void;
-
-// ======================================================
-// MINER POWER RESULT
-// ======================================================
 
 export type MinerPowerState = {
   minerInstanceId: string;
@@ -49,34 +26,18 @@ export type MinerPowerState = {
   requiredPower: number;
 };
 
-// ======================================================
-// POWER SYSTEM
-// ======================================================
-
 export default class PowerSystem {
-  // ====================================================
-  // PLACED POWER SOURCES
-  // ====================================================
-
   private powerSources:
     Map<
       string,
       PowerSourceInstance
     > = new Map();
 
-  // ====================================================
-  // PLACED RACKS
-  // ====================================================
-
   private racks:
     Map<
       string,
       RackInstance
     > = new Map();
-
-  // ====================================================
-  // LISTENERS
-  // ====================================================
 
   private listeners:
     PowerSystemListener[] = [];
@@ -148,9 +109,6 @@ export default class PowerSystem {
       return false;
     }
 
-    // Turn all miners off before removing
-    // rack from the facility network.
-
     for (
       const installed
       of rack.miners
@@ -166,6 +124,39 @@ export default class PowerSystem {
     this.recalculate();
 
     return true;
+  }
+
+  // ====================================================
+  // CLEAR FACILITY
+  //
+  // Clears runtime references when switching wallets.
+  //
+  // Listeners are intentionally preserved because the
+  // same PowerSystem instance continues to be used.
+  // ====================================================
+
+  public clear() {
+    // Turn miners belonging to the old facility off
+    // before dropping our references.
+
+    for (
+      const rack
+      of this.racks.values()
+    ) {
+      for (
+        const installed
+        of rack.miners
+      ) {
+        installed.powered =
+          false;
+      }
+    }
+
+    this.racks.clear();
+
+    this.powerSources.clear();
+
+    this.notifyListeners();
   }
 
   // ====================================================
@@ -195,28 +186,11 @@ export default class PowerSystem {
 
   // ====================================================
   // RECALCULATE
-  //
-  // Electricity is allocated from total facility
-  // capacity.
-  //
-  // Allocation order:
-  //
-  // 1. Rack registration order
-  // 2. Miner rack slot order
-  //
-  // If facility capacity runs out, remaining miners
-  // stay OFFLINE.
-  //
-  // Rack maxPower is intentionally NOT checked here.
   // ====================================================
 
   public recalculate() {
     let availablePower =
       this.getTotalCapacity();
-
-    // ----------------------------------------------
-    // FIRST TURN EVERYTHING OFF
-    // ----------------------------------------------
 
     for (
       const rack
@@ -230,10 +204,6 @@ export default class PowerSystem {
           false;
       }
     }
-
-    // ----------------------------------------------
-    // ALLOCATE FACILITY POWER
-    // ----------------------------------------------
 
     for (
       const rack
@@ -254,10 +224,6 @@ export default class PowerSystem {
           installed.miner
             .powerUsage;
 
-        // ------------------------------------------
-        // FACILITY CAPACITY CHECK
-        // ------------------------------------------
-
         if (
           availablePower <
           requiredPower
@@ -267,10 +233,6 @@ export default class PowerSystem {
 
           continue;
         }
-
-        // ------------------------------------------
-        // POWER MINER
-        // ------------------------------------------
 
         installed.powered =
           true;
@@ -285,8 +247,6 @@ export default class PowerSystem {
 
   // ====================================================
   // TOTAL CAPACITY
-  //
-  // Only ENABLED power sources count.
   // ====================================================
 
   public getTotalCapacity():
@@ -313,8 +273,6 @@ export default class PowerSystem {
 
   // ====================================================
   // INSTALLED CAPACITY
-  //
-  // Includes disabled power sources.
   // ====================================================
 
   public getInstalledCapacity():
@@ -335,9 +293,6 @@ export default class PowerSystem {
 
   // ====================================================
   // TOTAL DEMAND
-  //
-  // Electricity required if every installed miner
-  // were powered.
   // ====================================================
 
   public getTotalDemand():
@@ -364,8 +319,6 @@ export default class PowerSystem {
 
   // ====================================================
   // CURRENT POWER USAGE
-  //
-  // Only powered miners count.
   // ====================================================
 
   public getCurrentPowerUsage():
@@ -442,9 +395,7 @@ export default class PowerSystem {
   }
 
   // ====================================================
-  // POWER UTILIZATION
-  //
-  // Returns 0 -> 1.
+  // UTILIZATION
   // ====================================================
 
   public getUtilization():
@@ -467,9 +418,6 @@ export default class PowerSystem {
 
   // ====================================================
   // OVERLOADED
-  //
-  // True when installed hardware requires more
-  // electricity than the facility can supply.
   // ====================================================
 
   public isOverloaded():
@@ -493,7 +441,7 @@ export default class PowerSystem {
   }
 
   // ====================================================
-  // RACK CURRENT POWER
+  // RACK POWER USAGE
   // ====================================================
 
   public getRackPowerUsage(
@@ -528,7 +476,7 @@ export default class PowerSystem {
   }
 
   // ====================================================
-  // RACK ACTIVE HASHRATE
+  // RACK HASHRATE
   // ====================================================
 
   public getRackHashrate(
@@ -585,7 +533,7 @@ export default class PowerSystem {
   }
 
   // ====================================================
-  // GET MINER POWER STATE
+  // MINER POWER STATE
   // ====================================================
 
   public getMinerPowerState(
@@ -648,7 +596,7 @@ export default class PowerSystem {
   }
 
   // ====================================================
-  // GET ACTIVE MINERS
+  // ACTIVE MINERS
   // ====================================================
 
   public getActiveMiners():
