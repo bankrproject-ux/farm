@@ -2,6 +2,10 @@ import type {
   InventorySaveData,
 } from "../game/InventorySystem";
 
+import type {
+  SavedRackPlacement,
+} from "../game/RackPlacementSystem";
+
 // ======================================================
 // MINING TYCOON 3D
 // GAME SAVE MANAGER
@@ -13,6 +17,16 @@ import type {
 // POST /api/game/save
 //
 // One wallet = one game save.
+//
+// Persistent data:
+//
+// - Inventory
+// - Placed racks
+// - TYCON balance
+// - Total TYCON mined
+//
+// Power placement + full miner world persistence
+// will be connected next.
 //
 // ======================================================
 
@@ -30,7 +44,7 @@ export type GameSaveData = {
     unknown[];
 
   placedRacks:
-    unknown[];
+    SavedRackPlacement[];
 
   placedPower:
     unknown[];
@@ -456,6 +470,35 @@ export default class GameSaveManager {
     }
 
     // ==================================================
+    // PLACED RACKS
+    // ==================================================
+
+    const placedRacks:
+      SavedRackPlacement[] =
+        [];
+
+    if (
+      Array.isArray(
+        value.placedRacks
+      )
+    ) {
+      for (
+        const rack
+        of value.placedRacks
+      ) {
+        if (
+          this.isValidRackPlacement(
+            rack
+          )
+        ) {
+          placedRacks.push(
+            rack
+          );
+        }
+      }
+    }
+
+    // ==================================================
     // RETURN
     // ==================================================
 
@@ -483,12 +526,7 @@ export default class GameSaveManager {
           ? value.placedMiners
           : [],
 
-      placedRacks:
-        Array.isArray(
-          value.placedRacks
-        )
-          ? value.placedRacks
-          : [],
+      placedRacks,
 
       placedPower:
         Array.isArray(
@@ -516,6 +554,99 @@ export default class GameSaveManager {
           ? value.updatedAt
           : Date.now(),
     };
+  }
+
+  // ====================================================
+  // VALIDATE RACK PLACEMENT
+  // ====================================================
+
+  private isValidRackPlacement(
+    value: unknown
+  ): value is SavedRackPlacement {
+    if (
+      !value ||
+      typeof value !==
+        "object"
+    ) {
+      return false;
+    }
+
+    const rack =
+      value as Partial<
+        SavedRackPlacement
+      >;
+
+    if (
+      typeof rack.instanceId !==
+        "string" ||
+      rack.instanceId.length ===
+        0
+    ) {
+      return false;
+    }
+
+    if (
+      !rack.definition ||
+      typeof rack.definition !==
+        "object"
+    ) {
+      return false;
+    }
+
+    if (
+      !Array.isArray(
+        rack.miners
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      !rack.position ||
+      typeof rack.position !==
+        "object"
+    ) {
+      return false;
+    }
+
+    const position =
+      rack.position as {
+        x?: unknown;
+        y?: unknown;
+        z?: unknown;
+      };
+
+    if (
+      typeof position.x !==
+        "number" ||
+      !Number.isFinite(
+        position.x
+      ) ||
+      typeof position.y !==
+        "number" ||
+      !Number.isFinite(
+        position.y
+      ) ||
+      typeof position.z !==
+        "number" ||
+      !Number.isFinite(
+        position.z
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      typeof rack.rotationY !==
+        "number" ||
+      !Number.isFinite(
+        rack.rotationY
+      )
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   // ====================================================
