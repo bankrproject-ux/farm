@@ -12,12 +12,13 @@ import type {
 
 // ======================================================
 // MINING TYCOON 3D
-// Player Inventory System
+// PLAYER INVENTORY SYSTEM
 //
-// Inventory supports:
+// Supports:
 // - Mining servers
 // - Server racks
 // - Electrical power hardware
+// - Export / restore for permanent saves
 // ======================================================
 
 // ======================================================
@@ -72,6 +73,14 @@ export type InventoryItem =
   | InventoryPowerSourceItem;
 
 // ======================================================
+// SAVED INVENTORY
+// ======================================================
+
+export type InventorySaveData = {
+  items: InventoryItem[];
+};
+
+// ======================================================
 // LISTENER
 // ======================================================
 
@@ -104,12 +113,6 @@ export default class InventorySystem {
 
   // ====================================================
   // UNIQUE INSTANCE ID
-  //
-  // Examples:
-  //
-  // miner_bitforge_s1_...
-  // rack_rack_start_8_...
-  // power_source_gridbox_2k_...
   // ====================================================
 
   private createInstanceId(
@@ -228,13 +231,6 @@ export default class InventorySystem {
 
   // ====================================================
   // REMOVE ITEM
-  //
-  // Used when:
-  //
-  // Rack is placed into world.
-  // Miner is installed into rack.
-  // Power source is placed.
-  // Hardware is sold.
   // ====================================================
 
   public removeItem(
@@ -416,12 +412,136 @@ export default class InventorySystem {
   }
 
   // ====================================================
+  // EXPORT SAVE
+  // ====================================================
+  //
+  // Creates a clean serializable copy.
+  //
+  // ====================================================
+
+  public exportSave():
+    InventorySaveData {
+    return {
+      items:
+        this.items.map(
+          (item) => ({
+            ...item,
+
+            definition: {
+              ...item.definition,
+            },
+          })
+        ),
+    };
+  }
+
+  // ====================================================
+  // RESTORE SAVE
+  // ====================================================
+
+  public restoreSave(
+    save:
+      InventorySaveData | null | undefined
+  ) {
+    if (
+      !save ||
+      !Array.isArray(
+        save.items
+      )
+    ) {
+      this.items =
+        [];
+
+      this.notifyListeners();
+
+      return;
+    }
+
+    const restored:
+      InventoryItem[] = [];
+
+    for (
+      const rawItem
+      of save.items
+    ) {
+      if (
+        !rawItem ||
+        typeof rawItem !==
+          "object"
+      ) {
+        continue;
+      }
+
+      if (
+        typeof rawItem.instanceId !==
+          "string" ||
+        !rawItem.instanceId
+      ) {
+        continue;
+      }
+
+      if (
+        rawItem.type !==
+          "miner" &&
+        rawItem.type !==
+          "rack" &&
+        rawItem.type !==
+          "power_source"
+      ) {
+        continue;
+      }
+
+      if (
+        !rawItem.definition ||
+        typeof rawItem.definition !==
+          "object"
+      ) {
+        continue;
+      }
+
+      if (
+        typeof rawItem.definition.id !==
+          "string"
+      ) {
+        continue;
+      }
+
+      if (
+        typeof rawItem.purchasedAt !==
+          "number" ||
+        !Number.isFinite(
+          rawItem.purchasedAt
+        )
+      ) {
+        continue;
+      }
+
+      restored.push(
+        rawItem
+      );
+    }
+
+    this.items =
+      restored;
+
+    // Avoid unnecessary instance ID collisions
+    // during this browser session.
+    this.instanceCounter =
+      restored.length;
+
+    this.notifyListeners();
+  }
+
+  // ====================================================
   // CLEAR INVENTORY
   // ====================================================
 
   public clear() {
     this.items =
       [];
+
+    this.instanceCounter =
+      0;
 
     this.notifyListeners();
   }
