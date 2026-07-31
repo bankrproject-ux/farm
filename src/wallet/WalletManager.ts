@@ -1,7 +1,9 @@
 import {
   createWalletClient,
   custom,
+  parseEther,
   type Address,
+  type Hash,
   type WalletClient,
 } from "viem";
 
@@ -112,12 +114,6 @@ export default class WalletManager {
       );
     }
 
-    // --------------------------------------------------
-    // REQUEST ACCOUNTS
-    //
-    // This triggers the wallet connection popup.
-    // --------------------------------------------------
-
     const accounts =
       await this.provider.request({
         method:
@@ -136,10 +132,6 @@ export default class WalletManager {
     const address =
       accounts[0] as Address;
 
-    // --------------------------------------------------
-    // CREATE VIEM WALLET CLIENT
-    // --------------------------------------------------
-
     this.walletClient =
       createWalletClient({
         transport:
@@ -148,16 +140,8 @@ export default class WalletManager {
           ),
       });
 
-    // --------------------------------------------------
-    // CHAIN ID
-    // --------------------------------------------------
-
     const chainId =
       await this.getProviderChainId();
-
-    // --------------------------------------------------
-    // STATE
-    // --------------------------------------------------
 
     this.state = {
       connected: true,
@@ -174,14 +158,6 @@ export default class WalletManager {
 
   // ====================================================
   // RESTORE CONNECTION
-  //
-  // IMPORTANT:
-  //
-  // eth_accounts does NOT open a wallet popup.
-  //
-  // If the user previously connected this website,
-  // we can restore the visible wallet state after
-  // refresh.
   // ====================================================
 
   public async restoreConnection() {
@@ -236,11 +212,6 @@ export default class WalletManager {
 
   // ====================================================
   // SIGN MESSAGE
-  //
-  // We'll use this next for authentication.
-  //
-  // Connecting a wallet alone is NOT enough to prove
-  // ownership of the address.
   // ====================================================
 
   public async signMessage(
@@ -264,6 +235,110 @@ export default class WalletManager {
       });
 
     return signature;
+  }
+
+  // ====================================================
+  // SEND ETH
+  // ====================================================
+  //
+  // Used by the hardware shop.
+  //
+  // Example:
+  //
+  // Player
+  //   ↓
+  // 0.0005 ETH
+  //   ↓
+  // Treasury wallet
+  //
+  // This method ONLY requests the transaction.
+  //
+  // A successful return value means the wallet/provider
+  // accepted and broadcast the transaction.
+  //
+  // Later the backend will independently verify:
+  //
+  // - transaction receipt
+  // - chain
+  // - sender
+  // - treasury recipient
+  // - ETH amount
+  // - transaction hash has not been used before
+  //
+  // before permanently granting purchased hardware.
+  // ====================================================
+
+  public async sendEth(
+    to: Address,
+    amountEth: string
+  ): Promise<Hash> {
+    if (
+      !this.walletClient ||
+      !this.state.address
+    ) {
+      throw new Error(
+        "Wallet is not connected."
+      );
+    }
+
+    if (
+      !to ||
+      !/^0x[a-fA-F0-9]{40}$/.test(
+        to
+      )
+    ) {
+      throw new Error(
+        "Invalid treasury address."
+      );
+    }
+
+    const normalizedAmount =
+      amountEth.trim();
+
+    if (
+      normalizedAmount.length ===
+      0
+    ) {
+      throw new Error(
+        "Invalid ETH amount."
+      );
+    }
+
+    let value: bigint;
+
+    try {
+      value =
+        parseEther(
+          normalizedAmount
+        );
+    } catch {
+      throw new Error(
+        "Invalid ETH amount."
+      );
+    }
+
+    if (
+      value <= 0n
+    ) {
+      throw new Error(
+        "ETH amount must be greater than zero."
+      );
+    }
+
+    const hash =
+      await this.walletClient.sendTransaction({
+        account:
+          this.state.address,
+
+        to,
+
+        value,
+
+        chain:
+          null,
+      });
+
+    return hash;
   }
 
   // ====================================================
@@ -303,27 +378,15 @@ export default class WalletManager {
       return;
     }
 
-    // --------------------------------------------------
-    // ACCOUNT CHANGE
-    // --------------------------------------------------
-
     this.provider.on(
       "accountsChanged",
       this.handleAccountsChanged
     );
 
-    // --------------------------------------------------
-    // NETWORK CHANGE
-    // --------------------------------------------------
-
     this.provider.on(
       "chainChanged",
       this.handleChainChanged
     );
-
-    // --------------------------------------------------
-    // PROVIDER DISCONNECT
-    // --------------------------------------------------
 
     this.provider.on(
       "disconnect",
