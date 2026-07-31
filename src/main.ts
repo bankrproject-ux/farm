@@ -4,13 +4,18 @@ import "./style.css";
 import PlayerController from "./game/PlayerController";
 import GameState from "./game/GameState";
 import InventorySystem from "./game/InventorySystem";
+
 import RackPlacementSystem, {
   type SavedRackPlacement,
 } from "./game/RackPlacementSystem";
+
 import RackInteractionSystem from "./game/RackInteractionSystem";
 import MinerVisualSystem from "./game/MinerVisualSystem";
 import PowerSystem from "./game/PowerSystem";
-import PowerSourcePlacementSystem from "./game/PowerSourcePlacementSystem";
+
+import PowerSourcePlacementSystem, {
+  type SavedPowerSourcePlacement,
+} from "./game/PowerSourcePlacementSystem";
 
 import ShopUI from "./ui/ShopUI";
 import InventoryUI from "./ui/InventoryUI";
@@ -26,6 +31,18 @@ import GameSaveManager, {
 // ======================================================
 // MINING TYCOON 3D
 // MAIN
+//
+// Persistent per-wallet facility:
+//
+// - Inventory
+// - Placed racks
+// - Installed miners inside racks
+// - Miner slot positions
+// - Miner powered state
+// - Power sources
+// - Power source position / rotation / enabled
+// - TYCON balance
+// - Total TYCON mined
 // ======================================================
 
 const app =
@@ -75,21 +92,33 @@ let placementSaveTimer:
   number | null = null;
 
 // ======================================================
-// RACK SAVE STATE
-// ======================================================
+// WORLD SYSTEM REFERENCES
 //
-// rackPlacement itself is created later because it
-// depends on scene/camera/world systems.
-//
-// Until then we keep the loaded rack data here.
+// These systems are initialized later after THREE scene,
+// camera and renderer exist.
 // ======================================================
 
 let rackPlacement:
   RackPlacementSystem | null =
     null;
 
+let powerPlacement:
+  PowerSourcePlacementSystem | null =
+    null;
+
+// ======================================================
+// PENDING RESTORE
+//
+// Wallet authentication can theoretically finish before
+// the THREE world systems have finished initialization.
+// ======================================================
+
 let pendingRackRestore:
   SavedRackPlacement[] = [];
+
+let pendingPowerRestore:
+  SavedPowerSourcePlacement[] =
+    [];
 
 // ======================================================
 // BUILD CURRENT SAVE
@@ -98,12 +127,17 @@ let pendingRackRestore:
 function buildCurrentSave():
   GameSaveData {
   return {
-    version: 1,
+    version: 2,
 
     inventory:
       inventory.exportSave(),
 
-    placedMiners: [],
+    // Installed miners are already stored inside:
+    //
+    // placedRacks[].miners
+    //
+    // Therefore there is intentionally NO
+    // placedMiners field.
 
     placedRacks:
       rackPlacement
@@ -111,7 +145,11 @@ function buildCurrentSave():
             .exportPlacedRacks()
         : pendingRackRestore,
 
-    placedPower: [],
+    placedPower:
+      powerPlacement
+        ? powerPlacement
+            .exportPlacedPowerSources()
+        : pendingPowerRestore,
 
     tyconBalance:
       gameState.getTyconBalance(),
@@ -122,6 +160,48 @@ function buildCurrentSave():
     updatedAt:
       Date.now(),
   };
+}
+
+// ======================================================
+// CANCEL SAVE TIMERS
+// ======================================================
+
+function cancelSaveTimers() {
+  if (
+    inventorySaveTimer !==
+    null
+  ) {
+    window.clearTimeout(
+      inventorySaveTimer
+    );
+
+    inventorySaveTimer =
+      null;
+  }
+
+  if (
+    gameStateSaveTimer !==
+    null
+  ) {
+    window.clearTimeout(
+      gameStateSaveTimer
+    );
+
+    gameStateSaveTimer =
+      null;
+  }
+
+  if (
+    placementSaveTimer !==
+    null
+  ) {
+    window.clearTimeout(
+      placementSaveTimer
+    );
+
+    placementSaveTimer =
+      null;
+  }
 }
 
 // ======================================================
@@ -167,14 +247,14 @@ function schedulePlacementSave() {
           .then(
             () => {
               console.log(
-                "World placement autosaved."
+                "World autosaved."
               );
             }
           )
           .catch(
             (error) => {
               console.error(
-                "World placement autosave failed:",
+                "World autosave failed:",
                 error
               );
             }
@@ -182,6 +262,56 @@ function schedulePlacementSave() {
       },
       350
     );
+}
+
+// ======================================================
+// CLEAR LOCAL WORLD
+// ======================================================
+
+function clearLocalWorld() {
+  // Remove visual miner objects before rack objects.
+  minerVisuals.clear();
+
+  rackInteraction.clear();
+
+  powerSystem.clear();
+
+  if (
+    rackPlacement
+  ) {
+    rackPlacement
+      .clearPlacedRacks();
+  }
+
+  if (
+    powerPlacement
+  ) {
+    powerPlacement
+      .clearPlacedPowerSources();
+
+    powerPlacement
+      .clearCollisionObjects();
+  }
+
+  pendingRackRestore =
+    [];
+
+  pendingPowerRestore =
+    [];
+
+  inventory.clear();
+
+  gameState.setTyconBalance(
+    0
+  );
+
+  gameState.setTotalTyconMined(
+    0
+  );
+
+  syncMiningPower();
+
+  updatePowerHUD();
 }
 
 // ======================================================
@@ -197,6 +327,8 @@ async function loadWalletSave(
   restoringSave =
     true;
 
+  cancelSaveTimers();
+
   gameSave.setWallet(
     address
   );
@@ -206,26 +338,18 @@ async function loadWalletSave(
       await gameSave.load();
 
     // ==================================================
+    // CLEAR PREVIOUS LOCAL PLAYER
+    // ==================================================
+
+    clearLocalWorld();
+
+    // ==================================================
     // EXISTING PLAYER
     // ==================================================
 
     if (saved) {
       // ----------------------------------------------
-      // Clear previous local world first.
-      // ----------------------------------------------
-
-      if (
-        rackPlacement
-      ) {
-        rackPlacement
-          .clearPlacedRacks();
-      }
-
-      pendingRackRestore =
-        [];
-
-      // ----------------------------------------------
-      // Inventory
+      // INVENTORY
       // ----------------------------------------------
 
       inventory.restoreSave(
@@ -245,7 +369,7 @@ async function loadWalletSave(
       );
 
       // ----------------------------------------------
-      // RACKS
+      // RACKS + INSTALLED MINERS
       // ----------------------------------------------
 
       if (
@@ -259,6 +383,32 @@ async function loadWalletSave(
           saved.placedRacks;
       }
 
+      // ----------------------------------------------
+      // POWER SOURCES
+      // ----------------------------------------------
+
+      if (
+        powerPlacement
+      ) {
+        powerPlacement
+          .restorePowerSources(
+            saved.placedPower
+          );
+      } else {
+        pendingPowerRestore =
+          saved.placedPower;
+      }
+
+      // ----------------------------------------------
+      // FINAL POWER RECALCULATION
+      // ----------------------------------------------
+
+      powerSystem.recalculate();
+
+      syncMiningPower();
+
+      updatePowerHUD();
+
       console.log(
         "Game save loaded:",
         address,
@@ -268,6 +418,9 @@ async function loadWalletSave(
 
         "| Racks:",
         saved.placedRacks.length,
+
+        "| Power sources:",
+        saved.placedPower.length,
 
         "| TYCON:",
         gameState.getTyconBalance(),
@@ -282,26 +435,6 @@ async function loadWalletSave(
     // ==================================================
 
     else {
-      inventory.clear();
-
-      if (
-        rackPlacement
-      ) {
-        rackPlacement
-          .clearPlacedRacks();
-      }
-
-      pendingRackRestore =
-        [];
-
-      gameState.setTyconBalance(
-        0
-      );
-
-      gameState.setTotalTyconMined(
-        0
-      );
-
       await gameSave.forceSave(
         buildCurrentSave()
       );
@@ -320,25 +453,16 @@ async function loadWalletSave(
       error
     );
 
-    inventory.clear();
-
-    if (
-      rackPlacement
+    try {
+      clearLocalWorld();
+    } catch (
+      clearError
     ) {
-      rackPlacement
-        .clearPlacedRacks();
+      console.error(
+        "Could not clear local world:",
+        clearError
+      );
     }
-
-    pendingRackRestore =
-      [];
-
-    gameState.setTyconBalance(
-      0
-    );
-
-    gameState.setTotalTyconMined(
-      0
-    );
 
     gameSave.reset();
 
@@ -357,49 +481,10 @@ async function loadWalletSave(
 // ======================================================
 
 async function closeWalletSaveSession() {
-  // Stop autosave immediately.
   saveSessionActive =
     false;
 
-  // ==================================================
-  // CANCEL QUEUED SAVES
-  // ==================================================
-
-  if (
-    inventorySaveTimer !==
-    null
-  ) {
-    window.clearTimeout(
-      inventorySaveTimer
-    );
-
-    inventorySaveTimer =
-      null;
-  }
-
-  if (
-    gameStateSaveTimer !==
-    null
-  ) {
-    window.clearTimeout(
-      gameStateSaveTimer
-    );
-
-    gameStateSaveTimer =
-      null;
-  }
-
-  if (
-    placementSaveTimer !==
-    null
-  ) {
-    window.clearTimeout(
-      placementSaveTimer
-    );
-
-    placementSaveTimer =
-      null;
-  }
+  cancelSaveTimers();
 
   // ==================================================
   // FINAL SAVE
@@ -432,25 +517,7 @@ async function closeWalletSaveSession() {
     true;
 
   try {
-    inventory.clear();
-
-    if (
-      rackPlacement
-    ) {
-      rackPlacement
-        .clearPlacedRacks();
-    }
-
-    pendingRackRestore =
-      [];
-
-    gameState.setTyconBalance(
-      0
-    );
-
-    gameState.setTotalTyconMined(
-      0
-    );
+    clearLocalWorld();
   } finally {
     restoringSave =
       false;
@@ -487,7 +554,6 @@ const walletUI =
     }
   );
 
-// Keep reference alive.
 void walletUI;
 
 // ======================================================
@@ -1362,6 +1428,9 @@ const rackManagement =
         installedMiner
           .miner.name,
 
+        "| Slot:",
+        installedMiner.slotIndex,
+
         "| Powered:",
         installedMiner.powered,
 
@@ -1403,8 +1472,14 @@ const rackInteraction =
       }
 
       if (
-        rackPlacement?.isActive() ||
-        powerPlacement.isActive()
+        (
+          rackPlacement?.isActive() ??
+          false
+        ) ||
+        (
+          powerPlacement?.isActive() ??
+          false
+        )
       ) {
         return;
       }
@@ -1425,7 +1500,7 @@ const rackInteraction =
 // POWER SOURCE PLACEMENT
 // ======================================================
 
-const powerPlacement =
+powerPlacement =
   new PowerSourcePlacementSystem(
     scene,
     camera,
@@ -1440,13 +1515,23 @@ const powerPlacement =
         powerSource
       );
 
+      powerSystem.recalculate();
+
+      schedulePlacementSave();
+
       console.log(
-        "Power source placed:",
+        "Power source registered:",
+        powerSource.instanceId,
+
+        "|",
         powerSource.definition.name,
 
         "| Capacity:",
         powerSource.definition.capacity,
         "W",
+
+        "| Enabled:",
+        powerSource.enabled,
 
         "| Facility capacity:",
         powerSystem.getTotalCapacity(),
@@ -1489,12 +1574,12 @@ rackPlacement =
       );
 
       powerPlacement
-        .registerCollisionObject(
+        ?.registerCollisionObject(
           object
         );
 
       // ----------------------------------------------
-      // RESTORE MINER VISUALS
+      // RESTORE INSTALLED MINER VISUALS
       // ----------------------------------------------
 
       if (
@@ -1515,13 +1600,8 @@ rackPlacement =
 
       powerSystem.recalculate();
 
-      // ----------------------------------------------
-      // SAVE NORMAL PLACEMENT
-      //
-      // During restore, restoringSave=true,
-      // so schedulePlacementSave() safely ignores it.
-      // ----------------------------------------------
-
+      // During restore this is ignored because
+      // restoringSave=true.
       schedulePlacementSave();
 
       console.log(
@@ -1537,15 +1617,14 @@ rackPlacement =
 // ======================================================
 // APPLY PENDING RACK RESTORE
 // ======================================================
-//
-// Wallet authentication may have finished before the
-// world placement systems were initialized.
-// ======================================================
 
 if (
   pendingRackRestore.length >
   0
 ) {
+  const previousRestoring =
+    restoringSave;
+
   restoringSave =
     true;
 
@@ -1563,9 +1642,52 @@ if (
       [];
   } finally {
     restoringSave =
-      false;
+      previousRestoring;
   }
 }
+
+// ======================================================
+// APPLY PENDING POWER RESTORE
+// ======================================================
+
+if (
+  pendingPowerRestore.length >
+  0
+) {
+  const previousRestoring =
+    restoringSave;
+
+  restoringSave =
+    true;
+
+  try {
+    powerPlacement
+      .restorePowerSources(
+        pendingPowerRestore
+      );
+
+    console.log(
+      "Pending power sources restored:",
+      pendingPowerRestore.length
+    );
+
+    pendingPowerRestore =
+      [];
+  } finally {
+    restoringSave =
+      previousRestoring;
+  }
+}
+
+// ======================================================
+// FINAL WORLD POWER SYNC
+// ======================================================
+
+powerSystem.recalculate();
+
+syncMiningPower();
+
+updatePowerHUD();
 
 // ======================================================
 // INVENTORY
@@ -1576,7 +1698,8 @@ const inventoryUI =
     inventory,
 
     (rackItem) => {
-      powerPlacement.cancel();
+      powerPlacement
+        ?.cancel();
 
       rackInteraction.setEnabled(
         false
@@ -1596,7 +1719,7 @@ const inventoryUI =
         false
       );
 
-      powerPlacement.start(
+      powerPlacement?.start(
         powerItem
       );
 
@@ -1628,7 +1751,10 @@ function anyPlacementActive():
       rackPlacement?.isActive() ??
       false
     ) ||
-    powerPlacement.isActive()
+    (
+      powerPlacement?.isActive() ??
+      false
+    )
   );
 }
 
@@ -1701,7 +1827,7 @@ function updateHUDState() {
   }
 
   if (
-    powerPlacement.isActive()
+    powerPlacement?.isActive()
   ) {
     help.textContent =
       "WASD MOVE  •  PLACE POWER UNIT  •  LEFT CLICK PLACE  •  R ROTATE  •  ESC CANCEL";
@@ -1912,7 +2038,7 @@ function updateUIStateWatcher() {
         ? "rack-placement"
         : "",
 
-      powerPlacement.isActive()
+      powerPlacement?.isActive()
         ? "power-placement"
         : "",
     ].join("|");
@@ -1991,7 +2117,7 @@ function animate() {
 
   rackPlacement?.update();
 
-  powerPlacement.update();
+  powerPlacement?.update();
 
   if (
     !anyMenuOpen() &&
