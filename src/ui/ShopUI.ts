@@ -1,5 +1,15 @@
-import GameState from "../game/GameState";
 import InventorySystem from "../game/InventorySystem";
+
+import WalletManager from "../wallet/WalletManager";
+
+import {
+  TREASURY_ADDRESS,
+  getMinerEthPrice,
+  getRackEthPrice,
+  getPowerEthPrice,
+  formatEthPrice,
+  hasTreasuryAddress,
+} from "../config/ChainConfig";
 
 import {
   MINERS,
@@ -17,25 +27,27 @@ import {
   type PowerSourceDefinition,
 } from "../mining/PowerTypes";
 
+import type {
+  Address,
+} from "viem";
+
 // ======================================================
 // MINING TYCOON 3D
-// SHOP UI
+// HARDWARE MARKET
+// ======================================================
 //
-// IMPORTANT:
+// Hardware purchases use ETH.
 //
-// GameState updates continuously while mining.
-// We MUST NOT rebuild the entire shop every time
-// GameState changes.
+// ETH flow:
 //
-// Otherwise BUY buttons get destroyed/recreated
-// every frame and become impossible to click.
+// Player wallet
+//      ↓
+// Treasury wallet
+//      ↓
+// Hardware delivered to inventory
 //
-// GameState updates:
-// - Balance text
-// - Buy button affordability
+// TYCON is NOT used to purchase hardware.
 //
-// Actual purchases:
-// - Re-render cards once
 // ======================================================
 
 type ShopTab =
@@ -44,11 +56,11 @@ type ShopTab =
   | "power";
 
 export default class ShopUI {
-  private gameState:
-    GameState;
-
   private inventory:
     InventorySystem;
+
+  private wallet:
+    WalletManager;
 
   private root:
     HTMLDivElement;
@@ -56,7 +68,7 @@ export default class ShopUI {
   private content:
     HTMLDivElement;
 
-  private balanceElement:
+  private walletElement:
     HTMLElement;
 
   private activeTab:
@@ -73,14 +85,14 @@ export default class ShopUI {
   // ====================================================
 
   constructor(
-    gameState: GameState,
-    inventory: InventorySystem
+    inventory: InventorySystem,
+    wallet: WalletManager
   ) {
-    this.gameState =
-      gameState;
-
     this.inventory =
       inventory;
+
+    this.wallet =
+      wallet;
 
     // ==================================================
     // ROOT
@@ -135,10 +147,10 @@ export default class ShopUI {
 
       <div class="shop-header-right">
         <div class="shop-balance">
-          <span>BALANCE</span>
+          <span>PAYMENT</span>
 
           <strong>
-            $0.00
+            WALLET
           </strong>
         </div>
 
@@ -156,19 +168,19 @@ export default class ShopUI {
       header
     );
 
-    const balanceElement =
+    const walletElement =
       header.querySelector<HTMLElement>(
         ".shop-balance strong"
       );
 
-    if (!balanceElement) {
+    if (!walletElement) {
       throw new Error(
-        "Shop balance element not found."
+        "Shop wallet element not found."
       );
     }
 
-    this.balanceElement =
-      balanceElement;
+    this.walletElement =
+      walletElement;
 
     // ==================================================
     // TABS
@@ -241,7 +253,7 @@ export default class ShopUI {
       "shop-footer";
 
     footer.textContent =
-      "Purchased hardware is delivered to your facility inventory.";
+      "Hardware purchases are paid with ETH from your connected wallet.";
 
     panel.appendChild(
       footer
@@ -321,18 +333,12 @@ export default class ShopUI {
     );
 
     // ==================================================
-    // GAME STATE
-    //
-    // CRITICAL FIX:
-    //
-    // Mining calls GameState listeners continuously.
-    //
-    // DO NOT call this.render() here.
+    // WALLET STATE
     // ==================================================
 
-    this.gameState.subscribe(
+    this.wallet.subscribe(
       () => {
-        this.updateBalance();
+        this.updateWalletDisplay();
 
         if (
           this.visible &&
@@ -345,9 +351,6 @@ export default class ShopUI {
 
     // ==================================================
     // INVENTORY
-    //
-    // Inventory changes happen much less frequently.
-    // We can safely rebuild cards here.
     // ==================================================
 
     this.inventory.subscribe(
@@ -361,7 +364,7 @@ export default class ShopUI {
       }
     );
 
-    this.updateBalance();
+    this.updateWalletDisplay();
 
     this.render();
   }
@@ -378,7 +381,7 @@ export default class ShopUI {
       "hidden"
     );
 
-    this.updateBalance();
+    this.updateWalletDisplay();
 
     this.render();
 
@@ -394,6 +397,12 @@ export default class ShopUI {
   // ====================================================
 
   public close() {
+    if (
+      this.purchasing
+    ) {
+      return;
+    }
+
     this.visible =
       false;
 
@@ -426,60 +435,85 @@ export default class ShopUI {
   }
 
   // ====================================================
-  // BALANCE
+  // WALLET DISPLAY
   // ====================================================
 
-  private updateBalance() {
-    this.balanceElement.textContent =
-      this.formatMoney(
-        this.gameState.getBalance()
-      );
+  private updateWalletDisplay() {
+    if (
+      !this.wallet.isConnected()
+    ) {
+      this.walletElement.textContent =
+        "NOT CONNECTED";
+
+      return;
+    }
+
+    this.walletElement.textContent =
+      this.wallet.getShortAddress();
   }
 
   // ====================================================
   // UPDATE BUY BUTTONS
-  //
-  // Updates existing DOM only.
-  //
-  // No card destruction.
-  // No event listener destruction.
   // ====================================================
 
   private updateBuyButtons() {
     const buttons =
       this.content
         .querySelectorAll<HTMLButtonElement>(
-          ".shop-buy[data-price]"
+          ".shop-buy"
         );
-
-    const balance =
-      this.gameState.getBalance();
 
     buttons.forEach(
       (button) => {
-        const price =
-          Number(
-            button.dataset.price
-          );
-
         if (
-          !Number.isFinite(
-            price
-          )
+          this.purchasing
         ) {
+          button.disabled =
+            true;
+
+          if (
+            button.dataset.processing ===
+            "true"
+          ) {
+            button.textContent =
+              "CONFIRM IN WALLET...";
+          } else {
+            button.textContent =
+              "WAIT...";
+          }
+
           return;
         }
 
-        const canAfford =
-          balance >= price;
+        if (
+          !this.wallet.isConnected()
+        ) {
+          button.disabled =
+            true;
+
+          button.textContent =
+            "WALLET REQUIRED";
+
+          return;
+        }
+
+        if (
+          !hasTreasuryAddress()
+        ) {
+          button.disabled =
+            true;
+
+          button.textContent =
+            "PAYMENT UNAVAILABLE";
+
+          return;
+        }
 
         button.disabled =
-          !canAfford;
+          false;
 
         button.textContent =
-          canAfford
-            ? "BUY"
-            : "INSUFFICIENT FUNDS";
+          "BUY";
       }
     );
   }
@@ -532,16 +566,19 @@ export default class ShopUI {
     grid.className =
       "shop-grid";
 
-    for (
-      const miner
-      of MINERS
-    ) {
-      grid.appendChild(
-        this.createMinerCard(
-          miner
-        )
-      );
-    }
+    MINERS.forEach(
+      (
+        miner,
+        index
+      ) => {
+        grid.appendChild(
+          this.createMinerCard(
+            miner,
+            index
+          )
+        );
+      }
+    );
 
     this.content.appendChild(
       grid
@@ -553,7 +590,8 @@ export default class ShopUI {
   // ====================================================
 
   private createMinerCard(
-    miner: MinerDefinition
+    miner: MinerDefinition,
+    index: number
   ): HTMLDivElement {
     const card =
       document.createElement(
@@ -573,9 +611,9 @@ export default class ShopUI {
         miner.id
       );
 
-    const canAfford =
-      this.gameState.canAfford(
-        miner.price
+    const price =
+      getMinerEthPrice(
+        index
       );
 
     card.innerHTML = `
@@ -662,8 +700,8 @@ export default class ShopUI {
           <span>PRICE</span>
 
           <strong>
-            ${this.formatMoney(
-              miner.price
+            ${formatEthPrice(
+              price
             )}
           </strong>
         </div>
@@ -671,18 +709,8 @@ export default class ShopUI {
         <button
           type="button"
           class="shop-buy"
-          data-price="${miner.price}"
-          ${
-            canAfford
-              ? ""
-              : "disabled"
-          }
         >
-          ${
-            canAfford
-              ? "BUY"
-              : "INSUFFICIENT FUNDS"
-          }
+          BUY
         </button>
       </div>
     `;
@@ -698,8 +726,10 @@ export default class ShopUI {
         event.preventDefault();
         event.stopPropagation();
 
-        this.buyMiner(
-          miner
+        void this.buyMiner(
+          miner,
+          price,
+          button
         );
       }
     );
@@ -711,58 +741,26 @@ export default class ShopUI {
   // BUY MINER
   // ====================================================
 
-  private buyMiner(
-    miner: MinerDefinition
+  private async buyMiner(
+    miner: MinerDefinition,
+    price: number,
+    button: HTMLButtonElement
   ) {
-    if (
-      this.purchasing
-    ) {
+    const success =
+      await this.processPayment(
+        price,
+        button
+      );
+
+    if (!success) {
       return;
     }
 
-    if (
-      !this.gameState.canAfford(
-        miner.price
-      )
-    ) {
-      this.updateBuyButtons();
+    this.inventory.addMiner(
+      miner
+    );
 
-      return;
-    }
-
-    this.purchasing =
-      true;
-
-    let purchased =
-      false;
-
-    try {
-      purchased =
-        this.gameState.spend(
-          miner.price
-        );
-
-      if (
-        purchased
-      ) {
-        this.inventory.addMiner(
-          miner
-        );
-      }
-    } finally {
-      this.purchasing =
-        false;
-    }
-
-    this.updateBalance();
-
-    if (
-      purchased
-    ) {
-      this.render();
-    } else {
-      this.updateBuyButtons();
-    }
+    this.render();
   }
 
   // ====================================================
@@ -778,16 +776,19 @@ export default class ShopUI {
     grid.className =
       "shop-grid";
 
-    for (
-      const rack
-      of RACKS
-    ) {
-      grid.appendChild(
-        this.createRackCard(
-          rack
-        )
-      );
-    }
+    RACKS.forEach(
+      (
+        rack,
+        index
+      ) => {
+        grid.appendChild(
+          this.createRackCard(
+            rack,
+            index
+          )
+        );
+      }
+    );
 
     this.content.appendChild(
       grid
@@ -799,7 +800,8 @@ export default class ShopUI {
   // ====================================================
 
   private createRackCard(
-    rack: RackDefinition
+    rack: RackDefinition,
+    index: number
   ): HTMLDivElement {
     const card =
       document.createElement(
@@ -814,9 +816,9 @@ export default class ShopUI {
         rack.id
       );
 
-    const canAfford =
-      this.gameState.canAfford(
-        rack.price
+    const price =
+      getRackEthPrice(
+        index
       );
 
     card.innerHTML = `
@@ -895,8 +897,8 @@ export default class ShopUI {
           <span>PRICE</span>
 
           <strong>
-            ${this.formatMoney(
-              rack.price
+            ${formatEthPrice(
+              price
             )}
           </strong>
         </div>
@@ -904,18 +906,8 @@ export default class ShopUI {
         <button
           type="button"
           class="shop-buy"
-          data-price="${rack.price}"
-          ${
-            canAfford
-              ? ""
-              : "disabled"
-          }
         >
-          ${
-            canAfford
-              ? "BUY"
-              : "INSUFFICIENT FUNDS"
-          }
+          BUY
         </button>
       </div>
     `;
@@ -931,8 +923,10 @@ export default class ShopUI {
         event.preventDefault();
         event.stopPropagation();
 
-        this.buyRack(
-          rack
+        void this.buyRack(
+          rack,
+          price,
+          button
         );
       }
     );
@@ -944,58 +938,26 @@ export default class ShopUI {
   // BUY RACK
   // ====================================================
 
-  private buyRack(
-    rack: RackDefinition
+  private async buyRack(
+    rack: RackDefinition,
+    price: number,
+    button: HTMLButtonElement
   ) {
-    if (
-      this.purchasing
-    ) {
+    const success =
+      await this.processPayment(
+        price,
+        button
+      );
+
+    if (!success) {
       return;
     }
 
-    if (
-      !this.gameState.canAfford(
-        rack.price
-      )
-    ) {
-      this.updateBuyButtons();
+    this.inventory.addRack(
+      rack
+    );
 
-      return;
-    }
-
-    this.purchasing =
-      true;
-
-    let purchased =
-      false;
-
-    try {
-      purchased =
-        this.gameState.spend(
-          rack.price
-        );
-
-      if (
-        purchased
-      ) {
-        this.inventory.addRack(
-          rack
-        );
-      }
-    } finally {
-      this.purchasing =
-        false;
-    }
-
-    this.updateBalance();
-
-    if (
-      purchased
-    ) {
-      this.render();
-    } else {
-      this.updateBuyButtons();
-    }
+    this.render();
   }
 
   // ====================================================
@@ -1011,16 +973,19 @@ export default class ShopUI {
     grid.className =
       "shop-grid";
 
-    for (
-      const source
-      of POWER_SOURCES
-    ) {
-      grid.appendChild(
-        this.createPowerSourceCard(
-          source
-        )
-      );
-    }
+    POWER_SOURCES.forEach(
+      (
+        source,
+        index
+      ) => {
+        grid.appendChild(
+          this.createPowerSourceCard(
+            source,
+            index
+          )
+        );
+      }
+    );
 
     this.content.appendChild(
       grid
@@ -1033,7 +998,8 @@ export default class ShopUI {
 
   private createPowerSourceCard(
     source:
-      PowerSourceDefinition
+      PowerSourceDefinition,
+    index: number
   ): HTMLDivElement {
     const card =
       document.createElement(
@@ -1049,9 +1015,9 @@ export default class ShopUI {
           source.id
         );
 
-    const canAfford =
-      this.gameState.canAfford(
-        source.price
+    const price =
+      getPowerEthPrice(
+        index
       );
 
     card.innerHTML = `
@@ -1130,8 +1096,8 @@ export default class ShopUI {
           <span>PRICE</span>
 
           <strong>
-            ${this.formatMoney(
-              source.price
+            ${formatEthPrice(
+              price
             )}
           </strong>
         </div>
@@ -1139,18 +1105,8 @@ export default class ShopUI {
         <button
           type="button"
           class="shop-buy"
-          data-price="${source.price}"
-          ${
-            canAfford
-              ? ""
-              : "disabled"
-          }
         >
-          ${
-            canAfford
-              ? "BUY"
-              : "INSUFFICIENT FUNDS"
-          }
+          BUY
         </button>
       </div>
     `;
@@ -1166,8 +1122,10 @@ export default class ShopUI {
         event.preventDefault();
         event.stopPropagation();
 
-        this.buyPowerSource(
-          source
+        void this.buyPowerSource(
+          source,
+          price,
+          button
         );
       }
     );
@@ -1179,83 +1137,195 @@ export default class ShopUI {
   // BUY POWER SOURCE
   // ====================================================
 
-  private buyPowerSource(
+  private async buyPowerSource(
     source:
-      PowerSourceDefinition
+      PowerSourceDefinition,
+    price: number,
+    button: HTMLButtonElement
   ) {
-    if (
-      this.purchasing
-    ) {
+    const success =
+      await this.processPayment(
+        price,
+        button
+      );
+
+    if (!success) {
       return;
     }
 
-    if (
-      !this.gameState.canAfford(
-        source.price
-      )
-    ) {
-      this.updateBuyButtons();
+    this.inventory.addPowerSource(
+      source
+    );
 
-      return;
+    this.render();
+  }
+
+  // ====================================================
+  // PROCESS ETH PAYMENT
+  // ====================================================
+
+  private async processPayment(
+    price: number,
+    button: HTMLButtonElement
+  ): Promise<boolean> {
+    if (
+      this.purchasing
+    ) {
+      return false;
+    }
+
+    // ==================================================
+    // WALLET CHECK
+    // ==================================================
+
+    if (
+      !this.wallet.isConnected()
+    ) {
+      window.alert(
+        "Connect your wallet before purchasing hardware."
+      );
+
+      return false;
+    }
+
+    // ==================================================
+    // TREASURY CHECK
+    // ==================================================
+
+    if (
+      !hasTreasuryAddress()
+    ) {
+      console.error(
+        "VITE_TREASURY_ADDRESS is missing or invalid."
+      );
+
+      window.alert(
+        "Hardware payments are currently unavailable."
+      );
+
+      return false;
+    }
+
+    // ==================================================
+    // PRICE CHECK
+    // ==================================================
+
+    if (
+      !Number.isFinite(
+        price
+      ) ||
+      price <= 0
+    ) {
+      console.error(
+        "Invalid hardware price:",
+        price
+      );
+
+      return false;
     }
 
     this.purchasing =
       true;
 
-    let purchased =
-      false;
+    button.dataset.processing =
+      "true";
+
+    this.updateBuyButtons();
 
     try {
-      purchased =
-        this.gameState.spend(
-          source.price
+      // ------------------------------------------------
+      // IMPORTANT:
+      //
+      // Number is converted to a decimal ETH string.
+      //
+      // ChainConfig prices are intentionally simple
+      // decimal values such as:
+      //
+      // 0.0005
+      // 0.001
+      // 0.002
+      // ------------------------------------------------
+
+      const amountEth =
+        this.toEthAmountString(
+          price
         );
 
-      if (
-        purchased
-      ) {
-        this.inventory.addPowerSource(
-          source
+      // ------------------------------------------------
+      // REQUEST PAYMENT
+      // ------------------------------------------------
+
+      const txHash =
+        await this.wallet.sendEth(
+          TREASURY_ADDRESS as Address,
+          amountEth
         );
-      }
+
+      console.log(
+        "Hardware purchase transaction submitted:",
+        txHash
+      );
+
+      // ------------------------------------------------
+      // DEVELOPMENT PURCHASE FLOW
+      //
+      // For now:
+      //
+      // wallet/provider returns a tx hash
+      //      ↓
+      // purchase is treated as submitted
+      //      ↓
+      // hardware is added by caller
+      //
+      // BEFORE production / withdrawable TYCON:
+      //
+      // backend MUST verify transaction receipt first.
+      // ------------------------------------------------
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Hardware payment failed:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Transaction failed.";
+
+      window.alert(
+        `Purchase failed:\n${message}`
+      );
+
+      return false;
     } finally {
       this.purchasing =
         false;
-    }
 
-    this.updateBalance();
+      delete button.dataset.processing;
 
-    if (
-      purchased
-    ) {
-      this.render();
-    } else {
       this.updateBuyButtons();
     }
   }
 
   // ====================================================
-  // FORMAT MONEY
+  // ETH AMOUNT STRING
   // ====================================================
 
-  private formatMoney(
+  private toEthAmountString(
     value: number
   ): string {
-    return new Intl.NumberFormat(
-      "en-US",
-      {
-        style:
-          "currency",
-
-        currency:
-          "USD",
-
-        maximumFractionDigits:
-          2,
-      }
-    ).format(
-      value
-    );
+    return value
+      .toFixed(18)
+      .replace(
+        /0+$/,
+        ""
+      )
+      .replace(
+        /\.$/,
+        ""
+      );
   }
 
   // ====================================================
