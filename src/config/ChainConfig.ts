@@ -1,77 +1,60 @@
 // ======================================================
 // MINING TYCOON 3D
-// BLOCKCHAIN CONFIGURATION
-// ======================================================
-//
-// Public blockchain configuration only.
-//
-// IMPORTANT:
-//
-// NEVER put:
-// - private keys
-// - seed phrases
-// - treasury private key
-//
-// inside this file.
-//
-// Treasury ADDRESS is public and safe to expose.
+// ROBINHOOD CHAIN MAINNET CONFIG
 // ======================================================
 
 // ======================================================
 // TREASURY
 // ======================================================
-//
-// ETH payments from hardware purchases will be sent
-// to this address.
-//
-// We use a Vite environment variable so the receiving
-// address can be changed without changing shop logic.
-//
-// Vercel environment variable:
-//
-// VITE_TREASURY_ADDRESS
-//
-// Example:
-//
-// 0x1234567890abcdef1234567890abcdef12345678
-//
-// ======================================================
 
 export const TREASURY_ADDRESS =
-  import.meta.env
-    .VITE_TREASURY_ADDRESS ??
-  "";
+  import.meta.env.VITE_TREASURY_ADDRESS ?? "";
 
 // ======================================================
-// ROBINHOOD CHAIN
+// ROBINHOOD CHAIN MAINNET
 // ======================================================
-//
-// We will fill the exact chain configuration once the
-// purchase transaction system is connected.
-//
-// Keeping it centralized prevents chain IDs / RPC
-// configuration from being scattered throughout
-// the game.
+
+export const ROBINHOOD_CHAIN = {
+  name: "Robinhood Chain",
+
+  chainId: 4663,
+
+  // 4663 decimal = 0x1237
+  chainIdHex: "0x1237",
+
+  rpcUrl:
+    "https://rpc.mainnet.chain.robinhood.com",
+
+  currency: {
+    name: "Ether",
+    symbol: "ETH",
+    decimals: 18,
+  },
+
+  blockExplorer:
+    "https://robinhoodchain.blockscout.com",
+} as const;
+
+// ======================================================
+// PAYMENT CURRENCY
 // ======================================================
 
 export const PAYMENT_CURRENCY =
   "ETH";
 
 // ======================================================
-// HARDWARE ETH PRICES
+// HARDWARE BASE PRICE
 // ======================================================
 //
-// Prices are based on hardware MODEL/TIER.
+// MODEL pricing:
 //
-// Buying multiple copies does NOT increase the price.
+// S1 = 0.0005 ETH
+// S2 = 0.001 ETH
+// S3 = 0.002 ETH
+// S4 = 0.004 ETH
+// S5 = 0.008 ETH
 //
-// Miner example:
-//
-// BitForge S1 = 0.0005 ETH
-// BitForge S2 = 0.0010 ETH
-// BitForge S3 = 0.0020 ETH
-// BitForge S4 = 0.0040 ETH
-//
+// Buying multiple units DOES NOT change their price.
 // ======================================================
 
 const BASE_HARDWARE_PRICE =
@@ -85,9 +68,7 @@ export function getTierPrice(
   tierIndex: number
 ): number {
   if (
-    !Number.isInteger(
-      tierIndex
-    ) ||
+    !Number.isInteger(tierIndex) ||
     tierIndex < 0
   ) {
     return BASE_HARDWARE_PRICE;
@@ -152,17 +133,10 @@ export function formatEthPrice(
     return "0 ETH";
   }
 
-  return `${value.toFixed(
-    8
-  )
-    .replace(
-      /0+$/,
-      ""
-    )
-    .replace(
-      /\.$/,
-      ""
-    )} ETH`;
+  return `${value
+    .toFixed(8)
+    .replace(/0+$/, "")
+    .replace(/\.$/, "")} ETH`;
 }
 
 // ======================================================
@@ -173,5 +147,18 @@ export function hasTreasuryAddress():
   boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(
     TREASURY_ADDRESS
+  );
+}
+
+// ======================================================
+// NETWORK CHECK
+// ======================================================
+
+export function isRobinhoodChain(
+  chainId: number | null
+): boolean {
+  return (
+    chainId ===
+    ROBINHOOD_CHAIN.chainId
   );
 }
