@@ -1,11 +1,17 @@
 import {
+  createPublicClient,
   createWalletClient,
   custom,
+  http,
   parseEther,
   type Address,
   type Hash,
   type WalletClient,
 } from "viem";
+
+import {
+  ROBINHOOD_CHAIN,
+} from "../config/ChainConfig";
 
 // ======================================================
 // MINING TYCOON 3D
@@ -54,12 +60,74 @@ declare global {
 }
 
 // ======================================================
+// ROBINHOOD VIEM CHAIN
+// ======================================================
+
+const robinhoodChain = {
+  id:
+    ROBINHOOD_CHAIN.chainId,
+
+  name:
+    ROBINHOOD_CHAIN.name,
+
+  nativeCurrency: {
+    name:
+      ROBINHOOD_CHAIN.currency.name,
+
+    symbol:
+      ROBINHOOD_CHAIN.currency.symbol,
+
+    decimals:
+      ROBINHOOD_CHAIN.currency.decimals,
+  },
+
+  rpcUrls: {
+    default: {
+      http: [
+        ROBINHOOD_CHAIN.rpcUrl,
+      ],
+    },
+  },
+
+  blockExplorers: {
+    default: {
+      name:
+        "Robinhood Chain Explorer",
+
+      url:
+        ROBINHOOD_CHAIN.blockExplorer,
+    },
+  },
+} as const;
+
+// ======================================================
+// PUBLIC CLIENT
+// ======================================================
+//
+// Used to verify that the transaction was actually
+// included successfully on Robinhood Chain.
+//
+// ======================================================
+
+const publicClient =
+  createPublicClient({
+    chain:
+      robinhoodChain,
+
+    transport:
+      http(
+        ROBINHOOD_CHAIN.rpcUrl
+      ),
+  });
+
+// ======================================================
 // WALLET MANAGER
 // ======================================================
 
 export default class WalletManager {
   private walletClient:
-    WalletClient | null = null;
+    WalletClient | null =
+      null;
 
   private state:
     WalletState = {
@@ -71,10 +139,12 @@ export default class WalletManager {
     };
 
   private listeners:
-    WalletStateListener[] = [];
+    WalletStateListener[] =
+      [];
 
   private provider:
-    EthereumProvider | null = null;
+    EthereumProvider | null =
+      null;
 
   // ====================================================
   // CONSTRUCTOR
@@ -108,9 +178,11 @@ export default class WalletManager {
 
   public async connect():
     Promise<WalletState> {
-    if (!this.provider) {
+    if (
+      !this.provider
+    ) {
       throw new Error(
-        "No EVM wallet detected. Install or open an EVM-compatible wallet."
+        "No EVM wallet detected."
       );
     }
 
@@ -132,13 +204,7 @@ export default class WalletManager {
     const address =
       accounts[0] as Address;
 
-    this.walletClient =
-      createWalletClient({
-        transport:
-          custom(
-            this.provider as any
-          ),
-      });
+    this.createWalletClient();
 
     const chainId =
       await this.getProviderChainId();
@@ -157,11 +223,36 @@ export default class WalletManager {
   }
 
   // ====================================================
+  // CREATE WALLET CLIENT
+  // ====================================================
+
+  private createWalletClient() {
+    if (
+      !this.provider
+    ) {
+      this.walletClient =
+        null;
+
+      return;
+    }
+
+    this.walletClient =
+      createWalletClient({
+        transport:
+          custom(
+            this.provider as any
+          ),
+      });
+  }
+
+  // ====================================================
   // RESTORE CONNECTION
   // ====================================================
 
   public async restoreConnection() {
-    if (!this.provider) {
+    if (
+      !this.provider
+    ) {
       return;
     }
 
@@ -182,13 +273,7 @@ export default class WalletManager {
       const address =
         accounts[0] as Address;
 
-      this.walletClient =
-        createWalletClient({
-          transport:
-            custom(
-              this.provider as any
-            ),
-        });
+      this.createWalletClient();
 
       const chainId =
         await this.getProviderChainId();
@@ -238,34 +323,175 @@ export default class WalletManager {
   }
 
   // ====================================================
+  // ENSURE ROBINHOOD CHAIN
+  // ====================================================
+  //
+  // BUY is not allowed to continue on Base,
+  // Ethereum, Arbitrum, etc.
+  //
+  // If Robinhood Chain is already configured:
+  // -> switch
+  //
+  // If it isn't configured:
+  // -> add network
+  // -> switch
+  //
+  // ====================================================
+
+  public async ensureRobinhoodChain():
+    Promise<void> {
+    if (
+      !this.provider
+    ) {
+      throw new Error(
+        "Wallet provider unavailable."
+      );
+    }
+
+    const currentChainId =
+      await this.getProviderChainId();
+
+    if (
+      currentChainId ===
+      ROBINHOOD_CHAIN.chainId
+    ) {
+      this.state = {
+        ...this.state,
+
+        chainId:
+          currentChainId,
+      };
+
+      this.notifyListeners();
+
+      return;
+    }
+
+    // ==================================================
+    // TRY SWITCH
+    // ==================================================
+
+    try {
+      await this.provider.request({
+        method:
+          "wallet_switchEthereumChain",
+
+        params: [
+          {
+            chainId:
+              ROBINHOOD_CHAIN.chainIdHex,
+          },
+        ],
+      });
+    } catch (error: any) {
+      // ----------------------------------------------
+      // 4902 generally means network is unknown
+      // to the wallet.
+      // ----------------------------------------------
+
+      if (
+        error?.code !== 4902
+      ) {
+        throw new Error(
+          "Please switch your wallet to Robinhood Chain."
+        );
+      }
+
+      // =================================================
+      // ADD ROBINHOOD CHAIN
+      // =================================================
+
+      await this.provider.request({
+        method:
+          "wallet_addEthereumChain",
+
+        params: [
+          {
+            chainId:
+              ROBINHOOD_CHAIN.chainIdHex,
+
+            chainName:
+              ROBINHOOD_CHAIN.name,
+
+            nativeCurrency: {
+              name:
+                ROBINHOOD_CHAIN.currency.name,
+
+              symbol:
+                ROBINHOOD_CHAIN.currency.symbol,
+
+              decimals:
+                ROBINHOOD_CHAIN.currency.decimals,
+            },
+
+            rpcUrls: [
+              ROBINHOOD_CHAIN.rpcUrl,
+            ],
+
+            blockExplorerUrls: [
+              ROBINHOOD_CHAIN.blockExplorer,
+            ],
+          },
+        ],
+      });
+
+      // =================================================
+      // SWITCH AFTER ADD
+      // =================================================
+
+      await this.provider.request({
+        method:
+          "wallet_switchEthereumChain",
+
+        params: [
+          {
+            chainId:
+              ROBINHOOD_CHAIN.chainIdHex,
+          },
+        ],
+      });
+    }
+
+    // ==================================================
+    // VERIFY NETWORK AFTER SWITCH
+    // ==================================================
+
+    const switchedChainId =
+      await this.getProviderChainId();
+
+    if (
+      switchedChainId !==
+      ROBINHOOD_CHAIN.chainId
+    ) {
+      throw new Error(
+        "Wallet is not connected to Robinhood Chain."
+      );
+    }
+
+    this.state = {
+      ...this.state,
+
+      chainId:
+        switchedChainId,
+    };
+
+    this.notifyListeners();
+  }
+
+  // ====================================================
   // SEND ETH
   // ====================================================
   //
-  // Used by the hardware shop.
+  // IMPORTANT:
   //
-  // Example:
+  // This function:
   //
-  // Player
-  //   ↓
-  // 0.0005 ETH
-  //   ↓
-  // Treasury wallet
+  // 1. Forces Robinhood Chain.
+  // 2. Sends ETH.
+  // 3. Waits for the transaction receipt.
+  // 4. Requires receipt.status === success.
+  // 5. Returns tx hash only after confirmation.
   //
-  // This method ONLY requests the transaction.
-  //
-  // A successful return value means the wallet/provider
-  // accepted and broadcast the transaction.
-  //
-  // Later the backend will independently verify:
-  //
-  // - transaction receipt
-  // - chain
-  // - sender
-  // - treasury recipient
-  // - ETH amount
-  // - transaction hash has not been used before
-  //
-  // before permanently granting purchased hardware.
   // ====================================================
 
   public async sendEth(
@@ -273,7 +499,6 @@ export default class WalletManager {
     amountEth: string
   ): Promise<Hash> {
     if (
-      !this.walletClient ||
       !this.state.address
     ) {
       throw new Error(
@@ -282,7 +507,6 @@ export default class WalletManager {
     }
 
     if (
-      !to ||
       !/^0x[a-fA-F0-9]{40}$/.test(
         to
       )
@@ -292,24 +516,41 @@ export default class WalletManager {
       );
     }
 
-    const normalizedAmount =
-      amountEth.trim();
+    // ==================================================
+    // FORCE ROBINHOOD MAINNET
+    // ==================================================
+
+    await this.ensureRobinhoodChain();
+
+    // ==================================================
+    // WALLET CLIENT CHECK
+    // ==================================================
 
     if (
-      normalizedAmount.length ===
-      0
+      !this.walletClient
+    ) {
+      this.createWalletClient();
+    }
+
+    if (
+      !this.walletClient
     ) {
       throw new Error(
-        "Invalid ETH amount."
+        "Wallet client unavailable."
       );
     }
 
-    let value: bigint;
+    // ==================================================
+    // PARSE ETH
+    // ==================================================
+
+    let value:
+      bigint;
 
     try {
       value =
         parseEther(
-          normalizedAmount
+          amountEth.trim()
         );
     } catch {
       throw new Error(
@@ -325,29 +566,124 @@ export default class WalletManager {
       );
     }
 
+    // ==================================================
+    // FINAL CHAIN CHECK
+    // ==================================================
+
+    const chainId =
+      await this.getProviderChainId();
+
+    if (
+      chainId !==
+      ROBINHOOD_CHAIN.chainId
+    ) {
+      throw new Error(
+        "Wrong network. Transaction cancelled."
+      );
+    }
+
+    // ==================================================
+    // SEND TRANSACTION
+    // ==================================================
+
     const hash =
       await this.walletClient.sendTransaction({
         account:
           this.state.address,
 
+        chain:
+          robinhoodChain,
+
         to,
 
         value,
-
-        chain:
-          null,
       });
+
+    console.log(
+      "Transaction submitted:",
+      hash
+    );
+
+    // ==================================================
+    // WAIT FOR RECEIPT
+    // ==================================================
+
+    const receipt =
+      await publicClient
+        .waitForTransactionReceipt({
+          hash,
+
+          confirmations:
+            1,
+
+          timeout:
+            120_000,
+        });
+
+    // ==================================================
+    // RECEIPT CHECK
+    // ==================================================
+
+    if (
+      receipt.status !==
+      "success"
+    ) {
+      throw new Error(
+        "Transaction reverted on Robinhood Chain."
+      );
+    }
+
+    // ==================================================
+    // VERIFY DESTINATION
+    // ==================================================
+    //
+    // Normal ETH transfers have no contractAddress.
+    // We retrieve the transaction itself to verify
+    // destination and value.
+    // ==================================================
+
+    const transaction =
+      await publicClient
+        .getTransaction({
+          hash,
+        });
+
+    if (
+      !transaction.to ||
+      transaction.to.toLowerCase() !==
+        to.toLowerCase()
+    ) {
+      throw new Error(
+        "Transaction destination verification failed."
+      );
+    }
+
+    if (
+      transaction.value !==
+      value
+    ) {
+      throw new Error(
+        "Transaction value verification failed."
+      );
+    }
+
+    console.log(
+      "Hardware payment confirmed:",
+      hash
+    );
 
     return hash;
   }
 
   // ====================================================
-  // GET CHAIN ID
+  // GET PROVIDER CHAIN ID
   // ====================================================
 
   private async getProviderChainId():
     Promise<number | null> {
-    if (!this.provider) {
+    if (
+      !this.provider
+    ) {
       return null;
     }
 
@@ -358,10 +694,21 @@ export default class WalletManager {
             "eth_chainId",
         }) as string;
 
-      return parseInt(
-        chainIdHex,
-        16
-      );
+      const chainId =
+        parseInt(
+          chainIdHex,
+          16
+        );
+
+      if (
+        Number.isNaN(
+          chainId
+        )
+      ) {
+        return null;
+      }
+
+      return chainId;
     } catch {
       return null;
     }
@@ -421,6 +768,8 @@ export default class WalletManager {
           accounts[0] as Address,
       };
 
+      this.createWalletClient();
+
       this.notifyListeners();
     };
 
@@ -454,7 +803,7 @@ export default class WalletManager {
     };
 
   // ====================================================
-  // DISCONNECT EVENT
+  // DISCONNECT
   // ====================================================
 
   private handleDisconnect =
@@ -493,7 +842,7 @@ export default class WalletManager {
   }
 
   // ====================================================
-  // GET ADDRESS
+  // ADDRESS
   // ====================================================
 
   public getAddress():
@@ -502,7 +851,7 @@ export default class WalletManager {
   }
 
   // ====================================================
-  // GET CHAIN
+  // CHAIN
   // ====================================================
 
   public getChainId():
@@ -511,7 +860,7 @@ export default class WalletManager {
   }
 
   // ====================================================
-  // IS CONNECTED
+  // CONNECTED
   // ====================================================
 
   public isConnected():
@@ -532,7 +881,9 @@ export default class WalletManager {
     const address =
       this.state.address;
 
-    if (!address) {
+    if (
+      !address
+    ) {
       return "";
     }
 
