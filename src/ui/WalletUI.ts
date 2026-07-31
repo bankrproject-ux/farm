@@ -4,7 +4,7 @@ import WalletManager, {
 
 // ======================================================
 // MINING TYCOON 3D
-// LANDING / WALLET GATE
+// LANDING / WALLET LOGIN
 // ======================================================
 
 export default class WalletUI {
@@ -28,6 +28,15 @@ export default class WalletUI {
 
   private connecting =
     false;
+
+  private signing =
+    false;
+
+  private authenticated =
+    false;
+
+  private authenticatedAddress:
+    string | null = null;
 
   private unsubscribe:
     (() => void) | null =
@@ -298,9 +307,6 @@ export default class WalletUI {
     this.walletStatus.className =
       "landing-wallet-status";
 
-    this.walletStatus.textContent =
-      "CONNECT YOUR EVM WALLET TO ACCESS YOUR FACILITY";
-
     loginPanel.appendChild(
       this.walletStatus
     );
@@ -325,7 +331,7 @@ export default class WalletUI {
     );
 
     // ==================================================
-    // CONNECT BUTTON
+    // MAIN BUTTON
     // ==================================================
 
     this.connectButton =
@@ -339,24 +345,10 @@ export default class WalletUI {
     this.connectButton.className =
       "landing-connect-button";
 
-    this.connectButton.innerHTML = `
-      <span class="landing-wallet-icon">
-        ◇
-      </span>
-
-      <span>
-        CONNECT WALLET
-      </span>
-
-      <span class="landing-button-arrow">
-        →
-      </span>
-    `;
-
     this.connectButton.addEventListener(
       "click",
       () => {
-        void this.handleConnect();
+        void this.handleMainButton();
       }
     );
 
@@ -365,7 +357,7 @@ export default class WalletUI {
     );
 
     // ==================================================
-    // NETWORK INFO
+    // NETWORK
     // ==================================================
 
     const network =
@@ -420,7 +412,7 @@ export default class WalletUI {
     disclaimer.innerHTML = `
       <span>◆</span>
 
-      Your wallet remains under your control.
+      Signing is free and does not send a transaction.
       Mining Tycoon never requests your private key.
     `;
 
@@ -521,13 +513,13 @@ export default class WalletUI {
     );
 
     // ==================================================
-    // WALLET STATE
+    // WALLET SUBSCRIPTION
     // ==================================================
 
     this.unsubscribe =
       this.wallet.subscribe(
         (state) => {
-          this.render(
+          this.handleWalletState(
             state
           );
         }
@@ -535,27 +527,44 @@ export default class WalletUI {
   }
 
   // ====================================================
-  // CONNECT
+  // MAIN BUTTON
   // ====================================================
 
-  private async handleConnect() {
+  private async handleMainButton() {
     if (
-      this.connecting
+      this.connecting ||
+      this.signing
     ) {
       return;
     }
 
-    // Already connected.
-    // For this first version, clicking again enters
-    // the facility.
+    // Not connected yet.
     if (
-      this.wallet.isConnected()
+      !this.wallet.isConnected()
     ) {
-      this.enterFacility();
+      await this.connectWallet();
 
       return;
     }
 
+    // Connected but not authenticated.
+    if (
+      !this.authenticated
+    ) {
+      await this.signLogin();
+
+      return;
+    }
+
+    // Connected + signed.
+    this.enterFacility();
+  }
+
+  // ====================================================
+  // CONNECT WALLET
+  // ====================================================
+
+  private async connectWallet() {
     if (
       !this.wallet.isWalletAvailable()
     ) {
@@ -597,13 +606,10 @@ export default class WalletUI {
         error
       );
 
-      const message =
+      this.showError(
         error instanceof Error
           ? error.message
-          : "Wallet connection failed.";
-
-      this.showError(
-        message
+          : "Wallet connection failed."
       );
     } finally {
       this.connecting =
@@ -619,6 +625,143 @@ export default class WalletUI {
   }
 
   // ====================================================
+  // SIGN LOGIN
+  // ====================================================
+
+  private async signLogin() {
+    const address =
+      this.wallet.getAddress();
+
+    if (!address) {
+      return;
+    }
+
+    this.signing =
+      true;
+
+    this.connectButton.disabled =
+      true;
+
+    this.walletStatus.textContent =
+      "WAITING FOR SIGNATURE...";
+
+    this.connectButton.innerHTML = `
+      <span class="landing-wallet-icon landing-wallet-loading">
+        ◇
+      </span>
+
+      <span>
+        SIGNING...
+      </span>
+
+      <span class="landing-button-arrow">
+        ...
+      </span>
+    `;
+
+    try {
+      // ------------------------------------------------
+      // Simple development login message.
+      //
+      // Later, when we harden authentication, this gets
+      // replaced by a server challenge / nonce.
+      // ------------------------------------------------
+
+      const message = [
+        "Mining Tycoon",
+        "",
+        "Sign this message to access your mining facility.",
+        "",
+        `Wallet: ${address}`,
+        "",
+        "This request will not trigger a blockchain transaction.",
+      ].join("\n");
+
+      const signature =
+        await this.wallet.signMessage(
+          message
+        );
+
+      if (!signature) {
+        throw new Error(
+          "Wallet did not return a signature."
+        );
+      }
+
+      // ------------------------------------------------
+      // DEVELOPMENT AUTH STATE
+      //
+      // A successful wallet signature is enough for our
+      // current development gate.
+      //
+      // Before production / valuable assets, this must
+      // be verified server-side.
+      // ------------------------------------------------
+
+      this.authenticated =
+        true;
+
+      this.authenticatedAddress =
+        address.toLowerCase();
+
+      this.render(
+        this.wallet.getState()
+      );
+    } catch (error) {
+      console.error(
+        "Wallet signing failed:",
+        error
+      );
+
+      this.showError(
+        error instanceof Error
+          ? error.message
+          : "Signature rejected."
+      );
+    } finally {
+      this.signing =
+        false;
+
+      this.connectButton.disabled =
+        false;
+
+      this.render(
+        this.wallet.getState()
+      );
+    }
+  }
+
+  // ====================================================
+  // WALLET STATE CHANGE
+  // ====================================================
+
+  private handleWalletState(
+    state: WalletState
+  ) {
+    // If account changes after signing,
+    // invalidate the previous login.
+
+    if (
+      this.authenticated &&
+      (
+        !state.address ||
+        state.address.toLowerCase() !==
+          this.authenticatedAddress
+      )
+    ) {
+      this.authenticated =
+        false;
+
+      this.authenticatedAddress =
+        null;
+    }
+
+    this.render(
+      state
+    );
+  }
+
+  // ====================================================
   // RENDER
   // ====================================================
 
@@ -626,19 +769,26 @@ export default class WalletUI {
     state: WalletState
   ) {
     if (
-      this.connecting
+      this.connecting ||
+      this.signing
     ) {
       return;
     }
 
     // ==================================================
-    // NOT CONNECTED
+    // DISCONNECTED
     // ==================================================
 
     if (
       !state.connected ||
       !state.address
     ) {
+      this.authenticated =
+        false;
+
+      this.authenticatedAddress =
+        null;
+
       this.overlay.classList.remove(
         "wallet-connected"
       );
@@ -653,9 +803,6 @@ export default class WalletUI {
 
       this.networkStatus.textContent =
         "AUTO DETECT";
-
-      this.connectButton.disabled =
-        false;
 
       this.connectButton.innerHTML = `
         <span class="landing-wallet-icon">
@@ -682,9 +829,6 @@ export default class WalletUI {
       "wallet-connected"
     );
 
-    this.walletStatus.textContent =
-      "WALLET CONNECTED";
-
     this.walletAddress.style.display =
       "flex";
 
@@ -701,8 +845,39 @@ export default class WalletUI {
         state.chainId
       );
 
-    this.connectButton.disabled =
-      false;
+    // ==================================================
+    // CONNECTED BUT NOT SIGNED
+    // ==================================================
+
+    if (
+      !this.authenticated
+    ) {
+      this.walletStatus.textContent =
+        "WALLET CONNECTED — SIGN TO LOGIN";
+
+      this.connectButton.innerHTML = `
+        <span class="landing-wallet-icon">
+          ◇
+        </span>
+
+        <span>
+          SIGN TO LOGIN
+        </span>
+
+        <span class="landing-button-arrow">
+          →
+        </span>
+      `;
+
+      return;
+    }
+
+    // ==================================================
+    // AUTHENTICATED
+    // ==================================================
+
+    this.walletStatus.textContent =
+      "IDENTITY VERIFIED — FACILITY READY";
 
     this.connectButton.innerHTML = `
       <span class="landing-wallet-icon">
@@ -790,7 +965,8 @@ export default class WalletUI {
 
   private enterFacility() {
     if (
-      !this.wallet.isConnected()
+      !this.wallet.isConnected() ||
+      !this.authenticated
     ) {
       return;
     }
@@ -806,6 +982,32 @@ export default class WalletUI {
       },
       550
     );
+  }
+
+  // ====================================================
+  // AUTH INFO
+  // ====================================================
+
+  public isAuthenticated():
+    boolean {
+    return (
+      this.authenticated &&
+      this.wallet.isConnected()
+    );
+  }
+
+  public getUserId():
+    string | null {
+    if (
+      !this.isAuthenticated()
+    ) {
+      return null;
+    }
+
+    return this.wallet
+      .getAddress()
+      ?.toLowerCase() ??
+      null;
   }
 
   // ====================================================
