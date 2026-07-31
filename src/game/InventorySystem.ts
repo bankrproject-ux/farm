@@ -414,27 +414,72 @@ export default class InventorySystem {
   // ====================================================
   // EXPORT SAVE
   // ====================================================
-  //
-  // Creates a clean serializable copy.
-  //
-  // ====================================================
 
   public exportSave():
     InventorySaveData {
     return {
       items:
         this.items.map(
-          (item) => ({
-            ...item,
+          (item): InventoryItem => {
+            if (
+              item.type ===
+              "miner"
+            ) {
+              return {
+                instanceId:
+                  item.instanceId,
 
-            definition: {
-              ...item.definition,
-            },
-          })
+                type:
+                  "miner",
+
+                definition: {
+                  ...item.definition,
+                },
+
+                purchasedAt:
+                  item.purchasedAt,
+              };
+            }
+
+            if (
+              item.type ===
+              "rack"
+            ) {
+              return {
+                instanceId:
+                  item.instanceId,
+
+                type:
+                  "rack",
+
+                definition: {
+                  ...item.definition,
+                },
+
+                purchasedAt:
+                  item.purchasedAt,
+              };
+            }
+
+            return {
+              instanceId:
+                item.instanceId,
+
+              type:
+                "power_source",
+
+              definition: {
+                ...item.definition,
+              },
+
+              purchasedAt:
+                item.purchasedAt,
+            };
+          }
         ),
     };
   }
-
+  
   // ====================================================
   // RESTORE SAVE
   // ====================================================
