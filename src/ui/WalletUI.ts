@@ -7,6 +7,14 @@ import WalletManager, {
 // LANDING / WALLET LOGIN
 // ======================================================
 
+type AuthenticatedCallback =
+  (
+    address: string
+  ) => void | Promise<void>;
+
+type DisconnectedCallback =
+  () => void | Promise<void>;
+
 export default class WalletUI {
   private wallet:
     WalletManager;
@@ -48,15 +56,33 @@ export default class WalletUI {
     (() => void) | null =
       null;
 
+  private onAuthenticated:
+    AuthenticatedCallback | null;
+
+  private onDisconnected:
+    DisconnectedCallback | null;
+
   // ====================================================
   // CONSTRUCTOR
   // ====================================================
 
   constructor(
-    wallet: WalletManager
+    wallet: WalletManager,
+    onAuthenticated?:
+      AuthenticatedCallback,
+    onDisconnected?:
+      DisconnectedCallback
   ) {
     this.wallet =
       wallet;
+
+    this.onAuthenticated =
+      onAuthenticated ??
+      null;
+
+    this.onDisconnected =
+      onDisconnected ??
+      null;
 
     // ==================================================
     // ROOT OVERLAY
@@ -695,6 +721,17 @@ export default class WalletUI {
       "DISCONNECTING...";
 
     try {
+      // ----------------------------------------------
+      // IMPORTANT:
+      // Clear game/save session BEFORE wallet changes.
+      // ----------------------------------------------
+
+      if (
+        this.onDisconnected
+      ) {
+        await this.onDisconnected();
+      }
+
       await this.wallet.disconnect();
 
       this.authenticated =
@@ -799,25 +836,52 @@ export default class WalletUI {
         );
       }
 
+      const normalizedAddress =
+        address.toLowerCase();
+
       this.authenticated =
         true;
 
       this.authenticatedAddress =
-        address.toLowerCase();
+        normalizedAddress;
+
+      // ----------------------------------------------
+      // LOGIN SUCCESS
+      //
+      // Game persistence starts here.
+      // This does NOT run merely from wallet connect.
+      // ----------------------------------------------
+
+      if (
+        this.onAuthenticated
+      ) {
+        await this.onAuthenticated(
+          normalizedAddress
+        );
+      }
 
       this.render(
         this.wallet.getState()
       );
     } catch (error) {
       console.error(
-        "Wallet signing failed:",
+        "Wallet signing/login failed:",
         error
       );
+
+      // If loading the authenticated game session
+      // fails, do not leave the UI authenticated.
+
+      this.authenticated =
+        false;
+
+      this.authenticatedAddress =
+        null;
 
       this.showError(
         error instanceof Error
           ? error.message
-          : "Signature rejected."
+          : "Signature or login failed."
       );
     } finally {
       this.signing =
