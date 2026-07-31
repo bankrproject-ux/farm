@@ -841,6 +841,44 @@ export default class WalletManager {
     };
   }
 
+    // ====================================================
+  // MANUAL DISCONNECT / SWITCH WALLET
+  // ====================================================
+
+  public async disconnect():
+    Promise<void> {
+    if (
+      this.provider
+    ) {
+      try {
+        // MetaMask and some EIP-1193 wallets support
+        // revoking account permissions.
+        await this.provider.request({
+          method:
+            "wallet_revokePermissions",
+
+          params: [
+            {
+              eth_accounts: {},
+            },
+          ],
+        });
+      } catch (error) {
+        // Not every wallet supports
+        // wallet_revokePermissions.
+        //
+        // We still clear the game's local wallet state
+        // so the user can reconnect / switch account.
+        console.warn(
+          "Wallet permission revoke not supported:",
+          error
+        );
+      }
+    }
+
+    this.clearConnection();
+  }
+  
   // ====================================================
   // ADDRESS
   // ====================================================
