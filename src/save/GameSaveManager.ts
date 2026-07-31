@@ -59,6 +59,26 @@ export type GameSaveData = {
 };
 
 // ======================================================
+// OFFLINE MINING RESULT
+// ======================================================
+
+export type OfflineMiningResult = {
+  elapsedSeconds: number;
+
+  rewardedSeconds: number;
+
+  capped: boolean;
+
+  activeHashrate: number;
+
+  powerCapacity: number;
+
+  powerUsed: number;
+
+  tyconEarned: number;
+};
+
+// ======================================================
 // LOAD RESPONSE
 // ======================================================
 
@@ -75,6 +95,9 @@ type LoadResponse = {
   createdAt?: string;
 
   updatedAt?: string;
+
+  offlineMining?:
+    OfflineMiningResult | null;
 
   error?: string;
 };
@@ -112,6 +135,14 @@ export default class GameSaveManager {
   private lastSavedJson =
     "";
 
+  // Latest offline mining result returned
+  // by /api/game/load.
+  //
+  // This is NOT part of the permanent game save.
+  private lastOfflineMining:
+    OfflineMiningResult | null =
+      null;
+
   // ====================================================
   // SET WALLET
   // ====================================================
@@ -128,6 +159,9 @@ export default class GameSaveManager {
 
       this.lastSavedJson =
         "";
+
+      this.lastOfflineMining =
+        null;
 
       return;
     }
@@ -154,6 +188,9 @@ export default class GameSaveManager {
 
       this.pendingSave =
         null;
+
+      this.lastOfflineMining =
+        null;
     }
 
     this.walletAddress =
@@ -170,6 +207,24 @@ export default class GameSaveManager {
   }
 
   // ====================================================
+  // GET LAST OFFLINE MINING
+  // ====================================================
+
+  public getLastOfflineMining():
+    OfflineMiningResult | null {
+    return this.lastOfflineMining;
+  }
+
+  // ====================================================
+  // CLEAR LAST OFFLINE MINING
+  // ====================================================
+
+  public clearLastOfflineMining() {
+    this.lastOfflineMining =
+      null;
+  }
+
+  // ====================================================
   // LOAD
   // ====================================================
 
@@ -177,6 +232,11 @@ export default class GameSaveManager {
     Promise<GameSaveData | null> {
     const wallet =
       this.requireWallet();
+
+    // Always clear old metadata before
+    // starting a new load.
+    this.lastOfflineMining =
+      null;
 
     const response =
       await fetch(
@@ -220,6 +280,58 @@ export default class GameSaveManager {
     }
 
     // ==================================================
+    // OFFLINE MINING METADATA
+    // ==================================================
+
+    if (
+      this.isValidOfflineMining(
+        result.offlineMining
+      )
+    ) {
+      this.lastOfflineMining = {
+        elapsedSeconds:
+          this.safeNumber(
+            result.offlineMining
+              .elapsedSeconds
+          ),
+
+        rewardedSeconds:
+          this.safeNumber(
+            result.offlineMining
+              .rewardedSeconds
+          ),
+
+        capped:
+          result.offlineMining
+            .capped === true,
+
+        activeHashrate:
+          this.safeNumber(
+            result.offlineMining
+              .activeHashrate
+          ),
+
+        powerCapacity:
+          this.safeNumber(
+            result.offlineMining
+              .powerCapacity
+          ),
+
+        powerUsed:
+          this.safeNumber(
+            result.offlineMining
+              .powerUsed
+          ),
+
+        tyconEarned:
+          this.safeNumber(
+            result.offlineMining
+              .tyconEarned
+          ),
+      };
+    }
+
+    // ==================================================
     // NEW PLAYER
     // ==================================================
 
@@ -229,6 +341,9 @@ export default class GameSaveManager {
     ) {
       this.lastSavedJson =
         "";
+
+      this.lastOfflineMining =
+        null;
 
       return null;
     }
@@ -571,6 +686,68 @@ export default class GameSaveManager {
   }
 
   // ====================================================
+  // VALIDATE OFFLINE MINING
+  // ====================================================
+
+  private isValidOfflineMining(
+    value: unknown
+  ): value is OfflineMiningResult {
+    if (
+      !value ||
+      typeof value !==
+        "object"
+    ) {
+      return false;
+    }
+
+    const offline =
+      value as Partial<
+        OfflineMiningResult
+      >;
+
+    return (
+      typeof offline.elapsedSeconds ===
+        "number" &&
+      Number.isFinite(
+        offline.elapsedSeconds
+      ) &&
+
+      typeof offline.rewardedSeconds ===
+        "number" &&
+      Number.isFinite(
+        offline.rewardedSeconds
+      ) &&
+
+      typeof offline.capped ===
+        "boolean" &&
+
+      typeof offline.activeHashrate ===
+        "number" &&
+      Number.isFinite(
+        offline.activeHashrate
+      ) &&
+
+      typeof offline.powerCapacity ===
+        "number" &&
+      Number.isFinite(
+        offline.powerCapacity
+      ) &&
+
+      typeof offline.powerUsed ===
+        "number" &&
+      Number.isFinite(
+        offline.powerUsed
+      ) &&
+
+      typeof offline.tyconEarned ===
+        "number" &&
+      Number.isFinite(
+        offline.tyconEarned
+      )
+    );
+  }
+
+  // ====================================================
   // VALIDATE RACK PLACEMENT
   // ====================================================
 
@@ -615,7 +792,6 @@ export default class GameSaveManager {
       return false;
     }
 
-    // Validate every installed miner.
     for (
       const installedMiner
       of rack.miners
@@ -886,6 +1062,9 @@ export default class GameSaveManager {
 
     this.lastSavedJson =
       "";
+
+    this.lastOfflineMining =
+      null;
 
     this.saving =
       false;
