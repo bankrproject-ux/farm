@@ -17,6 +17,9 @@ export default class WalletUI {
   private connectButton:
     HTMLButtonElement;
 
+  private disconnectButton:
+    HTMLButtonElement;
+
   private walletStatus:
     HTMLDivElement;
 
@@ -30,6 +33,9 @@ export default class WalletUI {
     false;
 
   private signing =
+    false;
+
+  private disconnecting =
     false;
 
   private authenticated =
@@ -357,6 +363,38 @@ export default class WalletUI {
     );
 
     // ==================================================
+    // SWITCH WALLET BUTTON
+    // ==================================================
+
+    this.disconnectButton =
+      document.createElement(
+        "button"
+      );
+
+    this.disconnectButton.type =
+      "button";
+
+    this.disconnectButton.className =
+      "landing-disconnect-button";
+
+    this.disconnectButton.textContent =
+      "SWITCH WALLET";
+
+    this.disconnectButton.style.display =
+      "none";
+
+    this.disconnectButton.addEventListener(
+      "click",
+      () => {
+        void this.disconnectWallet();
+      }
+    );
+
+    loginPanel.appendChild(
+      this.disconnectButton
+    );
+
+    // ==================================================
     // NETWORK
     // ==================================================
 
@@ -533,12 +571,12 @@ export default class WalletUI {
   private async handleMainButton() {
     if (
       this.connecting ||
-      this.signing
+      this.signing ||
+      this.disconnecting
     ) {
       return;
     }
 
-    // Not connected yet.
     if (
       !this.wallet.isConnected()
     ) {
@@ -547,7 +585,6 @@ export default class WalletUI {
       return;
     }
 
-    // Connected but not authenticated.
     if (
       !this.authenticated
     ) {
@@ -556,7 +593,6 @@ export default class WalletUI {
       return;
     }
 
-    // Connected + signed.
     this.enterFacility();
   }
 
@@ -579,6 +615,9 @@ export default class WalletUI {
       true;
 
     this.connectButton.disabled =
+      true;
+
+    this.disconnectButton.disabled =
       true;
 
     this.walletStatus.textContent =
@@ -618,6 +657,82 @@ export default class WalletUI {
       this.connectButton.disabled =
         false;
 
+      this.disconnectButton.disabled =
+        false;
+
+      this.render(
+        this.wallet.getState()
+      );
+    }
+  }
+
+  // ====================================================
+  // DISCONNECT / SWITCH WALLET
+  // ====================================================
+
+  private async disconnectWallet() {
+    if (
+      this.connecting ||
+      this.signing ||
+      this.disconnecting
+    ) {
+      return;
+    }
+
+    this.disconnecting =
+      true;
+
+    this.connectButton.disabled =
+      true;
+
+    this.disconnectButton.disabled =
+      true;
+
+    this.walletStatus.textContent =
+      "DISCONNECTING WALLET...";
+
+    this.disconnectButton.textContent =
+      "DISCONNECTING...";
+
+    try {
+      await this.wallet.disconnect();
+
+      this.authenticated =
+        false;
+
+      this.authenticatedAddress =
+        null;
+
+      this.overlay.style.display =
+        "";
+
+      this.overlay.classList.remove(
+        "landing-leaving"
+      );
+    } catch (error) {
+      console.error(
+        "Wallet disconnect failed:",
+        error
+      );
+
+      this.showError(
+        error instanceof Error
+          ? error.message
+          : "Could not disconnect wallet."
+      );
+    } finally {
+      this.disconnecting =
+        false;
+
+      this.connectButton.disabled =
+        false;
+
+      this.disconnectButton.disabled =
+        false;
+
+      this.disconnectButton.textContent =
+        "SWITCH WALLET";
+
       this.render(
         this.wallet.getState()
       );
@@ -642,6 +757,9 @@ export default class WalletUI {
     this.connectButton.disabled =
       true;
 
+    this.disconnectButton.disabled =
+      true;
+
     this.walletStatus.textContent =
       "WAITING FOR SIGNATURE...";
 
@@ -660,13 +778,6 @@ export default class WalletUI {
     `;
 
     try {
-      // ------------------------------------------------
-      // Simple development login message.
-      //
-      // Later, when we harden authentication, this gets
-      // replaced by a server challenge / nonce.
-      // ------------------------------------------------
-
       const message = [
         "Mining Tycoon",
         "",
@@ -687,16 +798,6 @@ export default class WalletUI {
           "Wallet did not return a signature."
         );
       }
-
-      // ------------------------------------------------
-      // DEVELOPMENT AUTH STATE
-      //
-      // A successful wallet signature is enough for our
-      // current development gate.
-      //
-      // Before production / valuable assets, this must
-      // be verified server-side.
-      // ------------------------------------------------
 
       this.authenticated =
         true;
@@ -725,6 +826,9 @@ export default class WalletUI {
       this.connectButton.disabled =
         false;
 
+      this.disconnectButton.disabled =
+        false;
+
       this.render(
         this.wallet.getState()
       );
@@ -738,9 +842,6 @@ export default class WalletUI {
   private handleWalletState(
     state: WalletState
   ) {
-    // If account changes after signing,
-    // invalidate the previous login.
-
     if (
       this.authenticated &&
       (
@@ -770,7 +871,8 @@ export default class WalletUI {
   ) {
     if (
       this.connecting ||
-      this.signing
+      this.signing ||
+      this.disconnecting
     ) {
       return;
     }
@@ -794,6 +896,9 @@ export default class WalletUI {
       );
 
       this.walletAddress.style.display =
+        "none";
+
+      this.disconnectButton.style.display =
         "none";
 
       this.walletStatus.textContent =
@@ -831,6 +936,12 @@ export default class WalletUI {
 
     this.walletAddress.style.display =
       "flex";
+
+    this.disconnectButton.style.display =
+      "block";
+
+    this.disconnectButton.textContent =
+      "SWITCH WALLET";
 
     this.walletAddress.innerHTML = `
       <span class="landing-address-status"></span>
@@ -908,6 +1019,9 @@ export default class WalletUI {
     }
 
     switch (chainId) {
+      case 4663:
+        return "ROBINHOOD";
+
       case 1:
         return "ETHEREUM";
 
