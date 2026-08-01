@@ -101,7 +101,7 @@ type ApiResponse = {
 // RULES
 // ======================================================
 
-const MINIMUM_WITHDRAW = 50;
+const MINIMUM_WITHDRAW = 2000;
 
 const MAXIMUM_WITHDRAW = 1_000_000;
 
