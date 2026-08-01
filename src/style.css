@@ -2413,6 +2413,11 @@ canvas {
   align-items: center;
   justify-content: center;
 
+  /* Reserve the topbar (92px) and footer (62px) so the
+     content is centred in the free space, not behind
+     the bars. */
+  padding: 92px 0 62px;
+
   background:
     /* horizon lighting */
     radial-gradient(
@@ -4684,15 +4689,49 @@ canvas {
 ===================================================== */
 
 @media (
+  max-height: 1000px
+) {
+  .landing-content {
+    transform:
+      scale(0.9);
+  }
+}
+
+@media (
+  max-height: 900px
+) {
+  .landing-topbar {
+    height: 78px;
+  }
+
+  .landing-page {
+    padding: 78px 0 54px;
+  }
+
+  .landing-content {
+    transform:
+      scale(0.82);
+  }
+
+  .landing-footer {
+    height: 54px;
+  }
+}
+
+@media (
   max-height: 820px
 ) {
   .landing-topbar {
     height: 72px;
   }
 
+  .landing-page {
+    padding: 72px 0 48px;
+  }
+
   .landing-content {
     transform:
-      scale(0.88);
+      scale(0.74);
   }
 
   .landing-footer {
@@ -4707,6 +4746,10 @@ canvas {
 @media (
   max-width: 700px
 ) {
+  .landing-page {
+    padding: 70px 0 48px;
+  }
+
   .landing-topbar {
     height: 70px;
 
