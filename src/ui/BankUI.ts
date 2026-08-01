@@ -82,7 +82,7 @@ const BANK_STYLE_ID =
 const BANK_STYLES = `
 .bank-open-button {
   position: fixed;
-  top: 24px;
+  top: 132px;
   right: 24px;
   z-index: 40;
   padding: 12px 22px;
