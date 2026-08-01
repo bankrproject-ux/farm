@@ -26,7 +26,7 @@ import WalletManager from "../wallet/WalletManager";
 // RULES
 // ======================================================
 
-const MINIMUM_WITHDRAW = 50;
+const MINIMUM_WITHDRAW = 2000;
 
 const MAXIMUM_WITHDRAW = 1_000_000;
 
@@ -390,9 +390,9 @@ export default class BankUI {
           <input
             id="bank-input"
             type="number"
-            min="50"
+            min="2000"
             step="0.0001"
-            placeholder="50"
+            placeholder="2000"
           />
 
           <div class="bank-max">
@@ -408,7 +408,7 @@ export default class BankUI {
           Minimum Withdraw
 
           <strong>
-            50 TYCON
+            2000 TYCON
           </strong>
 
         </div>
