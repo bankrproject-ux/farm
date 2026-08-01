@@ -22,6 +22,9 @@ import InventoryUI from "./ui/InventoryUI";
 import RackManagementUI from "./ui/RackManagementUI";
 import WalletUI from "./ui/WalletUI";
 import OfflineMiningUI from "./ui/OfflineMiningUI";
+import BankUI, {
+  type BankWithdrawSuccess,
+} from "./ui/BankUI";
 
 import WalletManager from "./wallet/WalletManager";
 
@@ -1757,6 +1760,68 @@ const inventoryUI =
   );
 
 // ======================================================
+// BANK
+// ======================================================
+//
+// The backend is the authority on the TYCON balance
+// after a withdraw, so we take the balance it returns,
+// write it into GameState, and force a save.
+//
+// Without the force save the next autosave would push
+// the old client balance back into the database and
+// undo the withdrawal.
+// ======================================================
+
+const bankUI =
+  new BankUI(
+    wallet,
+
+    gameState,
+
+    (
+      result: BankWithdrawSuccess
+    ) => {
+      gameState.setTyconBalance(
+        result.balance
+      );
+
+      if (
+        !saveSessionActive ||
+        !gameSave.getWallet()
+      ) {
+        return;
+      }
+
+      void gameSave
+        .forceSave(
+          buildCurrentSave()
+        )
+        .then(
+          () => {
+            if (
+              result.txHash
+            ) {
+              console.log(
+                "Withdraw saved:",
+                result.amount,
+                "TYCON |",
+                result.txHash
+              );
+            }
+          }
+        )
+        .catch(
+          (error) => {
+            console.error(
+              "Could not save balance after withdraw:",
+              error
+            );
+          }
+        );
+    }
+  );
+
+// ======================================================
 // MENU STATE
 // ======================================================
 
@@ -1766,7 +1831,8 @@ function anyMenuOpen():
     shop.isOpen() ||
     inventoryUI.isOpen() ||
     rackManagement.isOpen() ||
-    offlineMiningUI.isOpen()
+    offlineMiningUI.isOpen() ||
+    bankUI.isOpened()
   );
 }
 
@@ -1857,6 +1923,15 @@ function updateHUDState() {
   }
 
   if (
+    bankUI.isOpened()
+  ) {
+    help.textContent =
+      "TYCON BANK";
+
+    return;
+  }
+
+  if (
     rackPlacement?.isActive()
   ) {
     help.textContent =
@@ -1915,7 +1990,8 @@ window.addEventListener(
     }
 
     if (
-      rackManagement.isOpen()
+      rackManagement.isOpen() ||
+      bankUI.isOpened()
     ) {
       return;
     }
@@ -1965,7 +2041,8 @@ window.addEventListener(
     }
 
     if (
-      rackManagement.isOpen()
+      rackManagement.isOpen() ||
+      bankUI.isOpened()
     ) {
       return;
     }
@@ -2018,6 +2095,18 @@ window.addEventListener(
         },
         0
       );
+
+      return;
+    }
+
+    if (
+      bankUI.isOpened()
+    ) {
+      bankUI.close();
+
+      updateInteractionState();
+
+      updateHUDState();
 
       return;
     }
@@ -2093,6 +2182,10 @@ function updateUIStateWatcher() {
 
       offlineMiningUI.isOpen()
         ? "offline-mining"
+        : "",
+
+      bankUI.isOpened()
+        ? "bank"
         : "",
 
       rackPlacement?.isActive()
